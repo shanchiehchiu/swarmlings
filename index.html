@@ -1147,7 +1147,7 @@ function step(dt) {
   stepFauna(dt); stepEvents(dt);
   S.achT = (S.achT || 0) - dt; if (S.achT <= 0) { S.achT = 2; checkAch(); }
   if (pop() > (S.peak || 0)) { S.peak = pop(); for (const m of [10, 25, 50, 100, 200, 300, 400]) if (S.peak >= m && !(S.pm || {})[m]) { (S.pm = S.pm || {})[m] = 1; addHist(`人口突破 ${m}。`, `Population passed ${m}.`, 'people'); } }
-  S.seedT = (S.seedT || 0) - dt; if (S.seedT <= 0) { S.seedT = 9; sprout(); }   // 森林緩慢蔓延
+  S.seedT = (S.seedT || 0) - dt; if (S.seedT <= 0) { S.seedT = pop() > 150 ? 5 : 9; sprout(); }   // 森林緩慢蔓延
   for (const b of S.builds) if (b.type === 'orchard' && b.done) { b.g = season() === 3 ? 0 : Math.min(1, (b.g || 0) + dt/(SEASON_LEN*1.6)); b.rt = b.g >= 1 ? (b.rt || 0) + dt : 0; }   // 作物：春天播種、一路長到入秋成熟；冬天霜害，沒收成就歸零
   for (const a of S.apples) if (a.fall > 0) a.fall = Math.max(0, a.fall - dt*60);
   if (S.ball) {
@@ -1201,7 +1201,8 @@ function updateCreature(c, dt) {
   if (low && !c.neg) { c.neg = true; S.stats.neglect++; } else if (!low && Math.min(c.h, c.c, c.f) > 30) c.neg = false;
   if (c.h <= 0) { c.hz += dt; if (c.hz > 45 && pop() > 1) { die(c); return; } } else c.hz = 0;
   // 繁殖：三種需求都滿足一段時間就會分裂
-  if (c.age > 25 && pop() < capacity() && Math.min(c.h, c.c, c.f) > 55) c.happyT += dt; else c.happyT = 0;
+  const foodOk = pop() < 40 || S.stock.apple >= Math.min(pop()*0.9, 400);   // 糧食吃緊時不再生育：人口會隨長者壽終慢慢回落，而不是餓死一大片
+  if (c.age > 25 && pop() < capacity() && foodOk && Math.min(c.h, c.c, c.f) > 55) c.happyT += dt; else c.happyT = 0;
   c.cd -= dt;
   if (c.happyT > 8 && c.cd <= 0) spawn(c);
   if (S.ritual) { moveTo(c, c.tx, c.ty, 45, dt); return; }
@@ -1242,7 +1243,7 @@ function planner() {
   if (S.disc.writing && !has('monument') && pop() >= 22) type = 'monument';
   else if (S.disc.language && !has('library')) type = 'library';
   else if (S.disc.fire && !has('fire')) type = 'fire';
-  else if (S.disc.farming && S.builds.filter(b => b.type === 'orchard').length < Math.min(6, 2 + Math.floor(pop()/60))) type = 'orchard';
+  else if (S.disc.farming && S.builds.filter(b => b.type === 'orchard').length < Math.min(12, 2 + Math.floor(pop()/40))) type = 'orchard';
   else if (pop() >= capacity() - 2) type = S.disc.tools ? 'house' : 'hut';
   if (!type || type === 'hut' || type === 'house') {   // 便利設施：買得起、條件到了就先蓋（蓋不出來的 90 秒內不再試）
     const ok = { well: pop() >= 10, dock: pop() >= 12, storage: pop() >= 14, mill: pop() >= 16 && has('orchard'), market: pop() >= 20 };
