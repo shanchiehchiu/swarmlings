@@ -353,89 +353,70 @@ function buildGround() {
   g.fillStyle = P.sky[0]; g.fillRect(0, 0, W, HORIZON); g.fillStyle = P.sky[1]; g.fillRect(0, HORIZON - 14, W, 14);   // 天空
   g.fillStyle = P.hedge; for (let x = 0; x < W; x += 6) g.fillRect(x, HORIZON, 4, 4 + Math.floor(rng()*3));       // 地平線的樹叢
 }
-// ---------- 道路網與地段：先有路，房子沿路蓋 ----------
-// 仿中世紀城鎮的「放射 + 環狀」形態：從廣場放射出主幹道，再疊上幾圈環路，最後在路旁每隔一段留一塊地段。
-// 建築只會蓋在地段上，而且由內往外一圈圈填滿，所以聚落緊湊、有街道的秩序（路網由種子決定，不需存檔）
+// ---------- 道路：由「走過的路」長出來 ----------
+// 不預先規劃路網。每蓋好一棟建築，就從它的門口用最低成本路徑（Dijkstra）走到最近的既有道路或廣場：
+// 繞開湖泊、樹與石頭、其他房子，並偏好走既有道路，所以自然形成分岔、匯流、蜿蜒的樹狀道路。
+// 新房子則優先蓋在既有道路旁（沿路發展）或既有房子旁（成群），不是格子也不是圓環。
+const CS = 4, GW = W/CS, GH = Math.ceil(H/CS);
+let RD = new Uint8Array(GW*GH), PLZ = new Uint8Array(GW*GH);   // RD：道路格；PLZ：廣場格
 const ROAD = { pts: [], lots: [], gy: { x: 30, y: 200 } };
 const eDist = (x, y) => Math.hypot(x - PILE.x, (y - PILE.y)/0.75);   // 橢圓距離（畫面是斜俯視，縱向壓縮）
-function genRoads(seed) {
-  const rng = mulberry32(seed + 31), pts = [], lots = [];
-  const ok = (x, y) => x >= 14 && x <= W - 14 && y >= HORIZON + 14 && y <= H - 8 && !isWater(x, y);
-  const at = (a, r) => [PILE.x + Math.cos(a)*r, PILE.y + Math.sin(a)*r*0.75];
-  let id = 0;
-  // 有機的路網：不等角的主幹道（各自蜿蜒、長度不一）、半途分岔的小巷、半徑起伏且有缺口的環路
-  const nx0 = rng()*300, ny0 = rng()*300, branches = [];
-  const radial = (x, y, a, maxN = 80, branchy = true) => {   // 沿方向前進，兩種頻率的蜿蜒；碰到水就跨過去（不畫路），水太寬或出界才停
-    const my = ++id, ph = rng()*6, ph2 = rng()*6, amp = 0.06 + rng()*0.07; let wet = 0, since = 0;
-    for (let i = 0; i < maxN; i++) {
-      a += Math.sin(ph + i*0.17)*amp*0.6 + Math.sin(ph2 + i*0.43)*amp*0.4 + (rng() - 0.5)*0.05; x += Math.cos(a)*6; y += Math.sin(a)*4.5;
-      if (x < 14 || x > W - 14 || y < HORIZON + 14 || y > H - 8) break;
-      if (isWater(x, y)) { if (++wet > 7) break; continue; } wet = 0; pts.push({ x, y, id: my, d: eDist(x, y) }); since++;
-      if (branchy && i > 6 && since > 7 && rng() < 0.09) { since = 0; branches.push([x, y, a + (rng() < 0.5 ? -1 : 1)*(0.9 + rng()*0.6)]); }   // 分岔出一條短巷
-    }
-  };
-  const N = 6 + Math.floor(rng()*3), a0 = rng()*Math.PI*2;
-  for (let i = 0; i < N; i++) { const a = a0 + i*Math.PI*2/N + (rng() - 0.5)*0.8, [x, y] = at(a, 38 + rng()*8); radial(x, y, a, 45 + Math.floor(rng()*40)); }
-  for (const R0 of [70, 118, 166]) {   // 環路：半徑隨角度起伏、圓心略偏、留幾個缺口，遇到水就斷開
-    const R = R0 + (rng() - 0.5)*14, ox = (rng() - 0.5)*12, oy = (rng() - 0.5)*8, n = Math.ceil(Math.PI*2*R*0.87/6), gaps = Array.from({ length: 1 + Math.floor(rng()*2) }, () => [rng()*Math.PI*2, 0.35 + rng()*0.7]);
-    let cur = ++id, inGap = false;
-    for (let i = 0; i < n; i++) {
-      const th = a0 + i/n*Math.PI*2, g = gaps.some(([s0, w]) => ((th - s0) % (Math.PI*2) + Math.PI*2) % (Math.PI*2) < w);
-      if (g) { if (!inGap) { cur = ++id; inGap = true; } continue; } inGap = false;
-      const wob = 1 + 0.2*(vnoise(Math.cos(th)*1.4 + nx0, Math.sin(th)*1.4 + ny0, seed + Math.round(R0)) - 0.5)*2, [x, y] = at(th, R*wob);
-      if (ok(x + ox, y + oy)) pts.push({ x: x + ox, y: y + oy, id: cur, d: eDist(x + ox, y + oy) }); else cur = ++id;
-    }
-  }
-  const N2 = 5 + Math.floor(rng()*4);
-  for (let i = 0; i < N2; i++) { const a = a0 + (i + 0.2 + rng()*0.6)*Math.PI*2/N2, [x, y] = at(a, 68 + rng()*10); radial(x, y, a, 30 + Math.floor(rng()*40)); }   // 次幹道：從第一圈環路再往外
-  for (const [x, y, a] of branches) radial(x, y, a, 6 + Math.floor(rng()*10), false);
-  const seen = new Set();   // 沿每條路每隔約 22px，在路的兩側各留一塊地段
-  const byId = new Map(); for (const p of pts) (byId.get(p.id) || byId.set(p.id, []).get(p.id)).push(p);
-  for (const line of byId.values()) {
-    let acc = 0;
-    for (let i = 1; i < line.length - 1; i++) {
-      acc += Math.hypot(line[i].x - line[i - 1].x, line[i].y - line[i - 1].y); if (acc < 17) continue; acc = 0;
-      const tx = line[i + 1].x - line[i - 1].x, ty = line[i + 1].y - line[i - 1].y, tl = Math.hypot(tx, ty) || 1, nx = -ty/tl, ny = tx/tl;
-      for (const sgn of [-1, 1]) {
-        const x = Math.round(line[i].x + nx*12*sgn), y = Math.round(line[i].y + ny*12*sgn);
-        if (!ok(x, y) || !ok(x - 8, y) || !ok(x + 8, y) || eDist(x, y) < 52) continue;
-        if (pts.some(q => Math.hypot(q.x - x, q.y - y) < 8)) continue;   // 不壓到別條路
-        if (lots.some(l => Math.hypot(l.x - x, l.y - y) < 14)) continue;
-        lots.push({ x, y, d: eDist(x, y) });
-      }
-    }
-  }
-  lots.sort((a, b) => a.d - b.d); ROAD.pts = pts; ROAD.lots = lots;
-  let gy = null, gs = -1;   // 墓園：整張地圖裡離路與地段最遠、不靠水、離廣場夠遠的一塊空地
+function genRoads(seed) {   // 只決定墓園位置與廣場格；道路本身在遊戲中長出來
+  RD.fill(0); PLZ.fill(0);
+  for (let cy = 0; cy < GH; cy++) for (let cx = 0; cx < GW; cx++) { const dx = (cx*CS + 2 - PILE.x)/46, dy = (cy*CS + 2 - PILE.y)/23; if (dx*dx + dy*dy <= 1) PLZ[cy*GW + cx] = 1; }
+  const rng = mulberry32(seed + 31), ok = (x, y) => x >= 14 && x <= W - 14 && y >= HORIZON + 14 && y <= H - 8 && !isWater(x, y);
+  let gy = null, gs = -1;   // 墓園：不靠水、離廣場夠遠的一塊空地
   for (let k = 0; k < 900; k++) {
     const x = 20 + rng()*(W - 100), y = HORIZON + 24 + rng()*(H - HORIZON - 70);
-    if (eDist(x + 24, y + 16) < 80 || !ok(x, y) || !ok(x + 50, y) || !ok(x, y + 38) || !ok(x + 50, y + 38) || !ok(x + 25, y + 19) || !ok(x + 25, y) || !ok(x + 25, y + 38) || !ok(x, y + 19) || !ok(x + 50, y + 19)) continue;
-    let m = 1e9; for (const l of lots) m = Math.min(m, Math.hypot(l.x - (x + 24), l.y - (y + 16))); for (const q of pts) m = Math.min(m, Math.hypot(q.x - (x + 24), q.y - (y + 16)) + 12);
-    if (m > gs) { gs = m; gy = { x: Math.round(x), y: Math.round(y) }; }
+    if (eDist(x + 24, y + 16) < 85 || ![[0, 0], [50, 0], [0, 38], [50, 38], [25, 19], [25, 0], [25, 38], [0, 19], [50, 19]].every(([a, b]) => ok(x + a, y + b))) continue;
+    const v = Math.min(eDist(x, y), 190) + rng()*50; if (v > gs) { gs = v; gy = { x: Math.round(x), y: Math.round(y) }; }
   }
   ROAD.gy = gy || { x: 30, y: H - 60 };
 }
 function clearLand(x, y, r) {   // 蓋房子、鋪路的地方，樹與石頭要讓開
   S.nodes = S.nodes.filter(n => Math.hypot(n.x - x, n.y - y) >= r);
 }
-function rebuildRoads() {   // 廣場 + 每棟建築連回廣場的土路
+function connectRoad(b) {   // 從建築門口走到最近的路（Dijkstra，多目標）
+  const sx = clamp(Math.floor(b.x/CS), 0, GW - 1), sy = clamp(Math.floor((b.y + 4)/CS), 0, GH - 1), s = sy*GW + sx;
+  if (RD[s] || PLZ[s]) return;
+  const N = GW*GH, pen = new Float32Array(N), mark = (x0, y0, x1, y1, v) => { for (let cy = Math.max(0, Math.floor(y0/CS)); cy <= Math.min(GH - 1, Math.floor(y1/CS)); cy++) for (let cx = Math.max(0, Math.floor(x0/CS)); cx <= Math.min(GW - 1, Math.floor(x1/CS)); cx++) pen[cy*GW + cx] += v; };
+  for (const n of S.nodes) n.type === 'tree' ? mark(n.x - 5, n.y - 6, n.x + 5, n.y + 1, 4) : mark(n.x - 7, n.y - 8, n.x + 7, n.y + 1, 9);
+  for (const o of S.builds) if (o !== b) mark(o.x - (o.type === 'orchard' ? 20 : 12), o.y - 14, o.x + (o.type === 'orchard' ? 20 : 12), o.y + 3, 40);
+  const seed = WORLD.seed, dist = new Float32Array(N).fill(Infinity), prev = new Int32Array(N).fill(-1), heap = [[0, s]]; dist[s] = 0;
+  const push = it => { heap.push(it); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { let l = 2*i + 1, r = l + 1, m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
+  let goal = -1;
+  while (heap.length) {
+    const [d, u] = pop(); if (d > dist[u]) continue; if (u !== s && (RD[u] || PLZ[u])) { goal = u; break; }
+    const ux = u % GW, uy = (u/GW) | 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue; const vx = ux + dx, vy = uy + dy; if (vx < 0 || vy < 0 || vx >= GW || vy >= GH) continue;
+      const v = vy*GW + vx, X = vx*CS + 2, Y = vy*CS + 2; if (Y < HORIZON + 8) continue;
+      const base = (RD[v] || PLZ[v]) ? 0.3 : 1 + 0.9*vnoise(vx*0.22 + seed % 97, vy*0.22, seed) + (isWater(X, Y) ? 30 : 0) + pen[v];   // 蜿蜒的地形成本；水要涉水，能繞就繞
+      const nd = d + base*(dx && dy ? 1.414 : 1); if (nd < dist[v]) { dist[v] = nd; prev[v] = u; push([nd, v]); }
+    }
+  }
+  if (goal < 0) return;
+  const cells = []; for (let u = prev[goal]; u >= 0 && u !== -1; u = prev[u]) { cells.push(u); if (u === s) break; }
+  for (const u of cells) if (!RD[u]) { RD[u] = 1; (S.rd = S.rd || []).push(u); }
+  for (let k = 0; k < cells.length; k += 2) clearLand((cells[k] % GW)*CS + 2, ((cells[k]/GW) | 0)*CS + 2, 6);
+}
+function rebuildRoads() {   // 畫廣場、墓園與所有道路格
   const g = pathC.getContext('2d'), rng = mulberry32(WORLD.seed + 7);
   g.clearRect(0, 0, W, H); g.fillStyle = '#b58a55';
   for (let y = -23; y <= 23; y++) { const hw = Math.round(46*Math.sqrt(1 - (y/23)**2)); g.fillRect(PILE.x - hw, PILE.y + y, hw*2, 1); }   // 逐行畫橢圓，邊緣才是像素階梯
   g.fillStyle = '#a17847'; for (let i = 0; i < 150; i++) g.fillRect(PILE.x - 44 + Math.floor(rng()*88), PILE.y - 21 + Math.floor(rng()*42), 1, 1);
-  let ext = 60; for (const b of S.builds) ext = Math.max(ext, eDist(b.x, b.y) + 34); if (S.plan) ext = Math.max(ext, eDist(S.plan.x, S.plan.y) + 34);   // 路只鋪到聚落需要的範圍，隨聚落往外延伸
-  let g2; const act = ROAD.pts.filter(p => p.d <= ext);
-  for (let i = 1; i < act.length; i++) if (act[i].id === act[i - 1].id) addRoad(act[i - 1], act[i]);
-  for (const p of act) clearLand(p.x, p.y, 6);
-  { const g = ROAD.gy; clearLand(g.x + 22, g.y + 16, 34); g2 = pathC.getContext('2d'); g2.fillStyle = '#8a9a5a'; g2.fillRect(g.x - 5, g.y - 5, 56, 42); g2.fillStyle = '#9a8a70'; g2.fillRect(g.x - 6, g.y - 6, 58, 1); g2.fillRect(g.x - 6, g.y + 37, 58, 1); g2.fillRect(g.x - 6, g.y - 6, 1, 44); g2.fillRect(g.x + 51, g.y - 6, 1, 44); }   // 墓園：一小塊圍起來的草地
-  for (const b of S.builds) {   // 門前小徑：連到最近的路
-    let q = null, qd = 1e9; for (const p of act) { const d = Math.hypot(p.x - b.x, p.y - b.y); if (d < qd) { qd = d; q = p; } }
-    addRoad({ x: b.x, y: b.y + 4 }, q && qd < 30 ? q : PILE);
+  const gy = ROAD.gy; clearLand(gy.x + 22, gy.y + 16, 34); g.fillStyle = '#8a9a5a'; g.fillRect(gy.x - 5, gy.y - 5, 56, 42); g.fillStyle = '#9a8a70'; g.fillRect(gy.x - 6, gy.y - 6, 58, 1); g.fillRect(gy.x - 6, gy.y + 37, 58, 1); g.fillRect(gy.x - 6, gy.y - 6, 1, 44); g.fillRect(gy.x + 51, gy.y - 6, 1, 44);   // 墓園：圍起來的草地
+  for (let i = 0; i < RD.length; i++) if (RD[i]) {
+    const x = (i % GW)*CS, y = ((i/GW) | 0)*CS; if (isWater(x + 2, y + 2)) continue;
+    const h = (Math.imul(i, 2654435761) >>> 28), j = (h & 1); g.fillStyle = '#9a6f40'; g.fillRect(x - 1, y - 1 + j, CS + 2, CS + 2 - j); g.fillStyle = h < 5 ? '#b58a55' : '#c39560'; g.fillRect(x, y, CS, CS);   // 路：外圈深一點的路肩，中間亮一點的路面（約 6px 寬）
+    if (h > 12) { g.fillStyle = '#c99d64'; g.fillRect(x + (h & 3), y + ((h >> 2) & 3), 1, 1); }   // 路面的碎石感
   }
 }
-function addRoad(a, b) {
-  const g = pathC.getContext('2d'), n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y)/2));
-  for (let i = 0; i <= n; i++) { const x = Math.round(a.x + (b.x - a.x)*i/n), y = Math.round(a.y + (b.y - a.y)*i/n); if (isWater(x, y)) continue; g.fillStyle = i % 5 === 0 ? '#a17847' : '#b58a55'; g.fillRect(x - 1, y - 1, 3, 3); }
+function loadRoads() {   // 載入：優先用存檔的道路格；舊存檔沒有就依建築順序重新走一遍
+  RD.fill(0);
+  if (S.rd && S.rd.length) { for (const i of S.rd) RD[i] = 1; return; }
+  S.rd = []; for (const b of S.builds.slice().sort((a, c) => (a.t || 0) - (c.t || 0))) connectRoad(b);
 }
 const nearestShore = c => { let b = null, bd = 1e9; for (const p of WORLD.shore) { const d = (p.x - c.x)**2 + (p.y - c.y)**2; if (d < bd) { bd = d; b = p; } } return b; };
 
@@ -462,13 +443,35 @@ function findSite(type) {
   if (type === 'fire') {   // 營火放在廣場邊緣
     for (const [dx, dy] of [[-34, 6], [34, 6], [-24, -14], [24, -14]]) { const l = { x: PILE.x + dx, y: PILE.y + dy }; if (!near(l, 16)) return l; }
   } else {
-    const free = ROAD.lots.filter(l => !isWater(l.x, l.y) && !isWater(l.x, l.y + 8) && !near(l, type === 'orchard' ? 27 : 15));
-    // 里程碑與圖書館放在靠近廣場的第一圈；果園放外圍；房屋由內往外一圈圈填滿
-    const score = { monument: l => Math.abs(l.d - 62), library: l => Math.abs(l.d - 58), orchard: l => l.d < 85 ? 999 : l.d, hut: l => l.d, house: l => l.d, well: l => Math.abs(l.d - 70), storage: l => Math.abs(l.d - 78), market: l => Math.abs(l.d - 56), mill: l => Math.abs(l.d - 96) }[type];
-    let best = null, bs = 1e9; for (const l of free) { const v = score(l) + Math.random()*5; if (v < bs) { bs = v; best = l; } }
-    if (best) return { x: best.x, y: best.y };
+    if ((type === 'hut' || type === 'house') && S.builds.filter(b => b.type === 'hut' || b.type === 'house').length >= 90) return null;   // 城市規模的上限
+    const ring = { monument: [58, 72, 62], library: [56, 70, 58], market: [56, 74, 60], well: [58, 82, 70], storage: [62, 96, 78], mill: [84, 120, 96], orchard: [88, 135, 100] }[type];
+    let best = null, bs = 1e9;
+    for (let k = 0; k < 140; k++) {
+      let bx = PILE.x, by = PILE.y, r, nb = 0;
+      if (ring) r = rnd(ring[0], ring[1]);   // 地標：繞著廣場的一圈；果園、磨坊在外圍
+      else { const q = Math.random();   // 住宅：優先沿既有道路，其次貼著既有房子，最後才是廣場邊緣
+        if (S.rd && S.rd.length && q < 0.8) { const i = S.rd[Math.floor(Math.random()*S.rd.length)]; bx = (i % GW)*CS + 2; by = ((i/GW) | 0)*CS + 2; r = rnd(11, 19); }
+        else if (S.builds.length && q < 0.9) { const b = pick(S.builds); bx = b.x; by = b.y; r = rnd(22, 32); } else r = rnd(54, 76); }
+      const a = Math.random()*Math.PI*2, x = Math.round(bx + Math.cos(a)*r), y = Math.round(by + Math.sin(a)*r*0.75);
+      if (!validSite(x, y, type)) continue;
+      const d = eDist(x, y); for (const b of S.builds) if (Math.hypot(b.x - x, b.y - y) < 44) nb++;
+      const v = ring ? Math.abs(d - ring[2]) + Math.random()*4 : d + Math.random()*16 - 4*Math.min(3, nb);   // 住宅：離廣場近、鄰居多的優先，加上隨機性
+      if (v < bs) { bs = v; best = { x, y }; }
+    }
+    if (best) return best;
   }
-  return ROAD.lots.length < 12 ? findSiteRandom(type) : null;   // 地段蓋滿就是這座城的容量上限；只有路網異常稀少的地圖才隨機找空地
+  return findSiteRandom(type);   // 備案：隨機找空地
+}
+function validSite(x, y, type) {
+  if (x < 24 || x > W - 24 || y < HORIZON + 22 || y > H - 14) return false;
+  for (const dx of [-11, 0, 11]) for (const dy of [-9, -3, 4]) if (isWater(x + dx, y + dy)) return false;
+  if (eDist(x, y) < 54 || Math.hypot(x - ROAD.gy.x - 22, y - ROAD.gy.y - 16) < 42) return false;
+  const big = type === 'orchard';
+  for (const b of S.builds) { if (b.type === 'orchard' || big) { if (Math.abs(b.x - x) < 31 && Math.abs(b.y - y) < 21) return false; } else if (Math.hypot(b.x - x, (b.y - y)*1.4) < 22) return false; }
+  if (S.plan && Math.hypot(S.plan.x - x, (S.plan.y - y)*1.4) < 24) return false;
+  const hw = big ? 19 : 10;   // 建築範圍內不能有道路
+  for (let cy = Math.floor((y - 7)/CS); cy <= Math.floor((y + 3)/CS); cy++) for (let cx = Math.floor((x - hw)/CS); cx <= Math.floor((x + hw)/CS); cx++) if (cx >= 0 && cy >= 0 && cx < GW && cy < GH && RD[cy*GW + cx]) return false;
+  return true;
 }
 function findSiteRandom(type) {
   for (const relax of [false, true]) {
@@ -832,7 +835,7 @@ function newGame(seed) {
   seed = seed ?? ((Math.random()*1e9) | 0);
   genWorld(seed); curSea = -1; cam.x = cam.y = 0; cam.z = 1; buildGround(); initFauna();
   S = { v: 2, seed, t: 0, time: 0.05, creatures: [], apples: [], nodes: [], builds: [], plan: null, stock: { apple: 0, wood: 0, stone: 0 },
-        tot: { apple: 0, wood: 0, stone: 0 }, disc: {}, graves: [], hist: [], peak: 1, ev: null, evCd: rnd(260, 420), stats: { fed: 0, pets: 0, washes: 0, played: 0, neglect: 0, born: 0, died: 0 },
+        tot: { apple: 0, wood: 0, stone: 0 }, disc: {}, graves: [], rd: [], hist: [], peak: 1, ev: null, evCd: rnd(260, 420), stats: { fed: 0, pets: 0, washes: 0, played: 0, neglect: 0, born: 0, died: 0 },
         score: { care: 0, ctrl: 0, curi: 0 }, phase: 'pet', q: 0, qTimer: 0, ball: null, nextId: 1, defy: 0, stareT: 40, staring: 0,
         ritual: null, knowledge: 0, log: [], banner: null, plannerT: 0, rolesT: 0, homesT: 0, rain: 0, rainCd: rnd(60, 160) };
   for (const [x, y] of WORLD.trees) S.nodes.push({ type: 'tree', x, y, apple: ri(3, 5), wood: ri(1, 3) });
@@ -1104,7 +1107,7 @@ function sprout() {   // 成樹會在附近落下種子；同一片地方擠滿�
   const a = rnd(Math.PI*2), r = rnd(14, 34), x = Math.round(par.x + Math.cos(a)*r), y = Math.round(par.y + Math.sin(a)*r*0.7);
   if (x < 12 || x > W - 12 || y < HORIZON + 14 || y > H - 8 || isWater(x, y) || isWater(x, y - 6) || isWater(x, y + 6)) return;
   if (Math.hypot(x - PILE.x, (y - PILE.y)*1.3) < 30 || Math.hypot(x - ROAD.gy.x - 22, y - ROAD.gy.y - 16) < 36) return;
-  if (ROAD.pts.some(q => Math.hypot(q.x - x, q.y - y) < 9) || ROAD.lots.some(l => Math.hypot(l.x - x, l.y - y) < 12)) return;
+  { const cx = Math.floor(x/CS), cy = Math.floor(y/CS); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) if (RD[(cy + b)*GW + cx + a]) return; }   // 不長在路上
   if (S.plan && Math.hypot(S.plan.x - x, S.plan.y - y) < 22) return;
   for (const b of S.builds) if (Math.hypot(b.x - x, b.y - y) < 20 || (b.type === 'orchard' && Math.abs(b.x - x) < 25 && Math.abs(b.y - y) < 15)) return;
   for (const n of S.nodes) if (Math.hypot(n.x - x, n.y - y) < 11) return;
@@ -1190,7 +1193,7 @@ function completePlan() {
   S.builds.push({ type: p.type, x: p.x, y: p.y, dx: p.dx, dy: p.dy, done: true, t: S.t, occ: [] });
   const nT = S.builds.filter(b => b.type === p.type).length, bn2 = BUILD[p.type];
   if (nT === 1) addHist(`蓋好了第一座${bn2.zh}。`, `Built the first ${bn2.en}.`); else if ((p.type === 'house' || p.type === 'hut') && nT % 10 === 0) addHist(`第 ${nT} 棟${bn2.zh}落成。`, `The ${nT}th ${bn2.en} was finished.`);
-  rebuildRoads();   // 路網往外延伸，並鋪好門前小徑
+  connectRoad(S.builds[S.builds.length - 1]); rebuildRoads();   // 從新房子的門口走出一條路，接到最近的路
   if (p.type === 'orchard') for (const d of [-27, 27]) S.nodes.push({ type: 'tree', x: p.x + d, y: p.y + 10, apple: 2, wood: 0 });
   sfx.disc(); logMsg(`${BUILD[p.type].zh}完成了！`, `The ${BUILD[p.type].en} is finished!`);
   if (p.type === 'monument') awaken();
@@ -1721,7 +1724,7 @@ function load() {
       S.ev = S.ev || null; S.evCd = S.evCd ?? 300; S.hist = S.hist || []; S.peak = S.peak || pop(); S.graves = S.graves || []; for (const c of S.creatures) { c.gen = c.gen || 1; c.par = c.par || 0; if (!c.life) c.life = c.age + rnd(500, 1300); }   // 舊存檔補上壽命與世代
       S.log = []; S.ritual = null; S.homesT = 0; S.rain = S.rain || 0; S.rainCd = S.rainCd || 100;
       for (const b of S.builds) b.occ = [];
-      fixOrchards(); rebuildRoads();
+      fixOrchards(); loadRoads(); rebuildRoads();
       if (S.phase === 'awake' && S.q >= QS.length) S.phase = 'done';
       return true;
     }
