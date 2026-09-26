@@ -25,6 +25,7 @@ _A single creature becomes a village in about 12 seconds of time-lapse, then the
 - **Procedural worlds.** Every game has a different map (lakes, forests, rocks, three palettes). Share one with `?seed=26`.
 - **A planned settlement.** Roads are not planned: whenever a building is finished, a lowest-cost path (Dijkstra) is walked from its door to the nearest road or the plaza, detouring around lakes, trees, rocks and other houses and preferring existing roads — so branching, merging, winding paths emerge on their own. New houses prefer spots along existing roads or next to other houses. Landmarks ring the plaza, farms and mills sit on the outskirts, docks on the shore. Landmarks sit near the plaza, farms on the outskirts, docks on the shore.
 - **Seasons.** Spring blossoms, summer green, autumn leaves, winter snow and frozen lakes. Water level rises and falls with the seasons.
+- **Food-limited growth.** When the stockpile runs low, births pause and the population eases back as elders pass on, instead of starving in droves. Farms scale with population (up to 12) and saplings spread faster in big towns.
 - **Farming that works.** Crops are sown in spring, ripen in autumn, frost in winter.
 - **Buildings and jobs.** Huts, houses, campfire, farm, library, monument, well, storehouse, mill, market, dock — plus farmers and fishers.
 - **Generations.** Parents, children, elders with white hair, gravestones in a graveyard, funerals.

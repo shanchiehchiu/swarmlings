@@ -794,12 +794,14 @@ function refine(id, k, kind) {   // kind：'spr' 精靈（受光邊＋漸層＋�
   }
   const c = document.createElement('canvas'); c.width = cw; c.height = ch; c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(out.buffer), cw, ch), 0, 0); return c;
 }
-function hiDraw(x0, y0, w, h, key, fn) {   // 用原本的畫法畫進暫存畫布 → 放大並補細節 → 貼回畫面
+function hiDraw(x0, y0, w, h, key, fn, detail) {   // 用原本的畫法畫進暫存畫布 → 放大並補細節 → 貼回畫面
   let hit = key && sprCache.get(key);
   if (!hit) {
     offC.width = w; offC.height = h; const main = ctx; ctx = offX; ctx.setTransform(1, 0, 0, 1, -x0, -y0); ctx.imageSmoothingEnabled = false;
     try { fn(); } finally { ctx = main; }
-    hit = refine(offX.getImageData(0, 0, w, h), R, 'spr'); if (key) { if (sprCache.size > 600) sprCache.clear(); sprCache.set(key, hit); }
+    hit = refine(offX.getImageData(0, 0, w, h), R, 'spr');
+    if (detail) { const main2 = ctx; ctx = hit.getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.setTransform(R, 0, 0, R, -x0*R, -y0*R); try { detail(); } finally { ctx = main2; } }   // 細節（屋瓦、葉叢…）也畫進快取圖，之後每個畫面只需貼圖
+    if (key) { if (sprCache.size > 4000) sprCache.clear(); sprCache.set(key, hit); }
   }
   ctx.drawImage(hit, x0, y0, w, h);
 }
@@ -1655,19 +1657,28 @@ function render(t) {
   const vis = o => o.x >= vx0 && o.x <= vx1 && o.y >= vy0 && o.y <= vy1;   // 視野外的東西不畫
   for (const n of S.nodes) if (vis(n)) items.push({ y: n.y, f: () => {
     const x = Math.round(n.x), y = Math.round(n.y);
-    if (n.type === 'tree') { if (lod === 0) drawTreeLo(n); else if (R > 1) hiDraw(x - 12, y - 26, 24, 30, `t|${seN}|${x},${y}|${n.g < 1 ? Math.round(n.g*4) : 5}|${Math.min(n.apple, 4)}`, () => drawTree(n)), (n.g === undefined || n.g >= 1) && drawTreeHi(n); else drawTree(n); }
+    if (n.type === 'tree') { if (lod === 0) drawTreeLo(n); else if (R > 1) hiDraw(x - 12, y - 26, 24, 30, `t|${seN}|${x},${y}|${n.g < 1 ? Math.round(n.g*4) : 5}|${Math.min(n.apple, 4)}`, () => drawTree(n), (n.g === undefined || n.g >= 1) ? () => drawTreeHi(n) : null); else drawTree(n); }
     else if (R > 1) hiDraw(x - 14, y - 17, 28, 21, `r|${seN}|${x},${y}|${Math.min(n.stone, 3)}`, () => drawRock(n)); else drawRock(n); } });
   for (const b of S.builds) if (vis(b)) items.push({ y: b.y, f: () => {
     if (lod === 0) return drawBuildLo(b, t); if (R === 1) return drawBuild(b, t);
     const bx = BOX[b.type] || [-20, -30, 40, 40], lit = darkness() > 0.5 && b.occ && b.occ.length ? 1 : 0, tb = ['fire', 'mill', 'hut', 'house'].includes(b.type) ? Math.floor(t*4) % 16 : 0;
-    hiDraw(Math.round(b.x) + bx[0], Math.round(b.y) + bx[1], bx[2], bx[3], b.type === 'monument' ? null : `b|${b.type}|${Math.round(b.x)},${Math.round(b.y)}|${lit}|${seN}|${b.type === 'orchard' ? Math.round((b.g || 0)*8) : 0}|${tb}|${b.dx || 0},${b.dy || 0}`, () => drawBuild(b, t)); drawBuildHi(b, t); } });
+    hiDraw(Math.round(b.x) + bx[0], Math.round(b.y) + bx[1], bx[2], bx[3], b.type === 'monument' ? null : `b|${b.type}|${Math.round(b.x)},${Math.round(b.y)}|${lit}|${seN}|${b.type === 'orchard' ? Math.round((b.g || 0)*8) : 0}|${tb}|${b.dx || 0},${b.dy || 0}`, () => drawBuild(b, t), () => drawBuildHi(b, t)); } });
   if (S.plan) items.push({ y: S.plan.y, f: () => drawPlan(S.plan) });
   items.push({ y: PILE.y, f: drawPile });
   for (const a of S.apples) items.push({ y: a.y, f: () => drawApple(a) });
   if (S.ball) items.push({ y: S.ball.y, f: () => drawBall(S.ball) });
   for (const g of S.graves) items.push({ y: g.y, f: () => { px(g.x - 3, g.y - 1, 7, 2, '#6b7a45'); px(g.x - 2, g.y - 7, 5, 6, '#b9c1ce'); px(g.x - 1, g.y - 8, 3, 1, '#b9c1ce'); px(g.x - 2, g.y - 7, 1, 6, '#d5dbe6'); px(g.x + 2, g.y - 7, 1, 6, '#8b93a1'); px(g.x, g.y - 5, 1, 3, '#666e7d'); px(g.x - 1, g.y - 4, 3, 1, '#666e7d'); } });
+  const nvis = R > 1 ? S.creatures.filter(vis).length : 0, fewC = nvis <= 40;   // 畫面上小生物不多才用細緻的臉
   for (const r of FA.rabbits) if (vis(r)) items.push({ y: r.y, f: () => drawRabbit(r) });
-  for (const c of S.creatures) if (vis(c)) items.push({ y: c.y, f: () => lod === 0 ? drawCreatureLo(c) : R > 1 ? (() => { FACE_HI = true; try { hiDraw(Math.round(c.x) - 10, Math.round(c.y) - 20, 20, 25, null, () => drawCreature(c, t)); } finally { FACE_HI = false; } drawFaceHi(c, t); })() : drawCreature(c, t) });
+  for (const c of S.creatures) if (vis(c)) items.push({ y: c.y, f: () => {
+    if (lod === 0) return drawCreatureLo(c); if (R === 1) return drawCreature(c, t);
+    if (c.bounce > 0) c.bounce -= 0.016;
+    const ad = c.age >= 25, mn = Math.min(c.h, c.c, c.f), bob = c.st === 'walk' ? (Math.floor(t*8) % 2) : 0, jump = c.bounce > 0 ? -2 : 0;
+    let fk = 'H'; if (!fewC) { const w = S.phase === 'awake' || S.phase === 'done' || dlgOpen || S.ritual; fk = `${mn < 30 ? 0 : mn > 65 ? 2 : 1}${c.h < 25 ? 1 : 0}${mn > 60 ? 1 : 0}${Math.floor(t*2 + c.id*7) % 9 === 0 ? 1 : 0}${w ? clamp(Math.round((mouse.x - c.x)/40), -1, 1) : c.face}${w ? clamp(Math.round((mouse.y - c.y)/40), -1, 1) : 0}`; }
+    const key = `c|${ad ? 1 : 0}|${ad && c.age > c.life*0.85 ? 1 : 0}|${c.role}|${c.st === 'sleep' ? 1 : 0}|${bob}|${jump}|${Math.floor((100 - c.c)/22)}|${c.carry || ''}|${fk}`;   // 外觀相同的小生物共用同一張放大圖
+    FACE_HI = fewC; try { hiDraw(Math.round(c.x) - 10, Math.round(c.y) - 20, 20, 25, key, () => drawCreature(c, t)); } finally { FACE_HI = false; }
+    if (fewC) drawFaceHi(c, t);
+  } });
   items.sort((a, b) => a.y - b.y); for (const i of items) i.f();
   drawBirds(t); drawEventFx(t);
   baseT();
