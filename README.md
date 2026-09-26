@@ -12,7 +12,7 @@ Single HTML file, zero dependencies, no build step. Open `index.html` and play. 
 
 | | |
 |---|---|
-| ![winter](docs/winter-aurora.png) | ![inspect](docs/inspect.png) |
+| ![winter](docs/winter-filter.png) | ![inspect](docs/inspect.png) |
 
 ## What is in it
 
