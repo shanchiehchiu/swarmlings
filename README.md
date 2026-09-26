@@ -10,19 +10,20 @@ Single HTML file, zero dependencies, no build step. Open `index.html` and play. 
 
 ![demo](docs/demo.gif)
 
-_A single creature becomes a village in about 15 seconds of time-lapse (roads, farms, seasons, generations)._
+_A single creature becomes a village in about 12 seconds of time-lapse, then the camera zooms in (level-of-detail switches to finer art)._
 
 ![settlement](docs/settlement.png)
 
 | | |
 |---|---|
 | ![winter](docs/winter-filter.png) | ![inspect](docs/inspect.png) |
+| ![close-up](docs/closeup.png) | Zoomed in 4×: shingled roofs, window frames, chimneys and detailed faces — the art gets *finer*, not just bigger. |
 
 ## What is in it
 
 - **Hands-off by default.** They eat fruit, bathe, chat and reproduce without you. Your care is a bonus, not a requirement.
 - **Procedural worlds.** Every game has a different map (lakes, forests, rocks, three palettes). Share one with `?seed=26`.
-- **A planned settlement.** Radial + ring roads grow outward from the plaza; buildings fill the lots along them ring by ring. Landmarks sit near the plaza, farms on the outskirts, docks on the shore.
+- **A planned settlement.** Roads are not planned: whenever a building is finished, a lowest-cost path (Dijkstra) is walked from its door to the nearest road or the plaza, detouring around lakes, trees, rocks and other houses and preferring existing roads — so branching, merging, winding paths emerge on their own. New houses prefer spots along existing roads or next to other houses. Landmarks ring the plaza, farms and mills sit on the outskirts, docks on the shore. Landmarks sit near the plaza, farms on the outskirts, docks on the shore.
 - **Seasons.** Spring blossoms, summer green, autumn leaves, winter snow and frozen lakes. Water level rises and falls with the seasons.
 - **Farming that works.** Crops are sown in spring, ripen in autumn, frost in winter.
 - **Buildings and jobs.** Huts, houses, campfire, farm, library, monument, well, storehouse, mill, market, dock — plus farmers and fishers.
@@ -34,6 +35,7 @@ _A single creature becomes a village in about 15 seconds of time-lapse (roads, f
 - **Terrain tool.** Plant trees, place rocks, dig ponds, fill water.
 - **Achievements & records** saved in your browser, plus nine different endings.
 - **Sound.** Rain, wind, birds, crickets and a seasonal pentatonic melody, all synthesized live with WebAudio (no audio files).
+- **Level of detail, in pixels.** Zoom in and the art gets *finer*, not just bigger: the canvas switches to 2× / 4× internal resolution, sprites are redrawn with a Scale2x pass (rounded corners) plus rim light, shading and grain, and the ground and roads get the same treatment (fine grain, tufts of grass, pebbles). Creature faces are redrawn at sub-pixel resolution — outlined eyes with iris, pupil and a catch-light that follow your mouse when they are watching, brows, blush, and a mouth that curves with their mood. Season changes still cross-fade at any zoom. Zoom out with a big crowd and it falls back to simple colour blocks with a role dot per creature. Force a level in the Menu (Detail: Auto / Far / Normal / Near / Close-up).
 - **Zoom & pan** with the wheel, right-drag, pinch or keyboard. Time speeds up to 100×.
 - **Everything is pixel art**, including the UI, drawn in code (only external asset: a pixel font, see below).
 

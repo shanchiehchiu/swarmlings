@@ -1433,6 +1433,63 @@ function drawFaceHi(c, t) {   // 細緻的臉：帶輪廓的眼白、虹膜與�
   else if (mn > 65) { hCurve(mx, my - 0.1, 1.7, 0.8, q*1.5, K); }
   else hpx(Math.round((mx - 0.9)/q)*q, Math.round(my/q)*q, 1.8, q*1.5, K);
 }
+// ---------- 特寫用的建築與樹的細節（畫在 1/R 像素的網格上，蓋在放大後的精靈上面）----------
+const hh2 = (a, b) => ((a*73856093) ^ (b*19349663)) >>> 0;
+function drawBuildHi(b, t) {
+  const x = Math.round(b.x), y = Math.round(b.y), q = 1/R, D = 'rgba(0,0,0,.22)', DD = 'rgba(0,0,0,.3)', win = (wx, wy, lit) => {   // 窗：深色框、十字窗格、窗檯、窗簾
+    hpx(wx - 0.4, wy - 0.4, 4.8, 0.4, '#5b3a12'); hpx(wx - 0.4, wy + 4, 4.8, 0.4, '#5b3a12'); hpx(wx - 0.4, wy, 0.4, 4, '#5b3a12'); hpx(wx + 4, wy, 0.4, 4, '#5b3a12');
+    hpx(wx + 2 - q, wy, q*2, 4, '#5b3a12'); hpx(wx, wy + 2 - q, 4, q*2, '#5b3a12'); hpx(wx - 0.7, wy + 4.4, 5.4, 0.6, '#c9a878'); hpx(wx - 0.7, wy + 5, 5.4, q, DD);
+    hpx(wx + 0.2, wy + 0.2, 0.9, 1.6, lit ? 'rgba(255,240,180,.5)' : 'rgba(255,255,255,.45)'); hpx(wx + 2.9, wy + 0.2, 0.9, 1.6, lit ? 'rgba(255,240,180,.5)' : 'rgba(255,255,255,.45)'); };
+  const roof = (x0, y0, w, h) => { for (let yy = 0; yy < h; yy++) { hpx(x0, y0 + yy + 0.85, w, q*1.5, D); for (let xx = (yy % 2)*1; xx < w; xx += 2) hpx(x0 + xx, y0 + yy, q, 0.9, 'rgba(0,0,0,.16)'); } hpx(x0, y0, w, q*2, 'rgba(255,190,160,.35)'); };
+  const lit = darkness() > 0.5 && b.occ && b.occ.length;
+  if (b.type === 'house') {
+    roof(x - 13, y - 15, 26, 6); roof(x - 9, y - 19, 18, 4); hpx(x - 11, y - 8.6, 22, 0.9, DD);   // 屋瓦、屋簷下的陰影
+    for (let i = 0; i < 10; i++) hpx(x - 11 + i*2.2, y + 0.6, 1.9, 1.3, 'rgba(96,96,108,.65)');   // 石砌地基
+    win(x + 5, y - 8, lit); win(x - 9, y - 8, lit);
+    hpx(x - 2.6, y - 5.4, 5.8, 0.5, '#4a2c12'); hpx(x - 1.6, y - 4.4, 1.7, 2.6, 'rgba(0,0,0,.28)'); hpx(x + 0.5, y - 4.4, 1.7, 2.6, 'rgba(0,0,0,.28)'); hpx(x + 1.6, y - 1.4, 0.6, 0.6, '#f0d060'); hpx(x - 3, y + 1.4, 6.4, 0.7, '#8a7a66');   // 門：框、嵌板、門把、門階
+    hpx(x + 6, y - 23, 3.6, 6, '#7a4a3a'); for (let k = 0; k < 4; k++) hpx(x + 6, y - 22.4 + k*1.4, 3.6, q, 'rgba(0,0,0,.3)'); hpx(x + 5.6, y - 23.6, 4.4, 0.8, '#5a3a2a');   // 磚砌煙囪與壓頂
+  } else if (b.type === 'hut') {
+    roof(x - 11, y - 12, 22, 5); roof(x - 8, y - 15, 16, 3);
+    for (let i = 0; i < 8; i++) hpx(x - 8.5 + i*2.2, y - 8, q, 9.6, D);   // 木板牆縫
+    hpx(x - 2.4, y - 4.4, 5, 0.4, '#4a2c12'); hpx(x + 1.6, y - 1.4, 0.6, 0.6, '#f0d060'); hpx(x - 9, y + 1.4, 18, 0.7, 'rgba(90,70,40,.5)');
+  } else if (b.type === 'orchard') {
+    for (const yy of [-8, -2, 4]) hpx(x - 17, y + yy + 4.6, 34, q*1.5, 'rgba(0,0,0,.25)');   // 田壟
+    for (let k = 0; k < 40; k++) { const h = hh2(x*31 + k, y*17 + k*7); hpx(x - 17 + (h % 340)/10, y - 8 + ((h >> 9) % 170)/10, 0.5, 0.4, h & 1 ? 'rgba(70,45,20,.6)' : 'rgba(190,150,100,.5)'); }   // 土塊
+    for (const fx of [-20, -7, 6, 19]) { hpx(x + fx - 0.6, y - 13.6, 1.8, 0.6, '#7a4a2a'); hpx(x + fx - 0.3, y - 11, q, 3, 'rgba(0,0,0,.3)'); }   // 木樁
+  } else if (b.type === 'well') {
+    for (let r = 0; r < 3; r++) for (let i = 0; i < 6; i++) hpx(x - 6 + i*2 + (r % 2)*1, y - 4 + r*1.9, 1.7, 1.5, r % 2 ? 'rgba(0,0,0,.18)' : 'rgba(255,255,255,.14)');   // 石磚
+    hpx(x - 3.8, y - 2.8, 7.6, 1.6, 'rgba(120,190,255,.5)'); roof(x - 8, y - 15, 16, 3); hpx(x - q, y - 12, q*2, 6, '#e8d9a8');
+  } else if (b.type === 'storage') {
+    for (let i = 0; i < 11; i++) hpx(x - 12 + i*2.2, y - 10, q, 12, D); roof(x - 14, y - 15, 28, 6);
+    hpx(x - 4, y - 8, 8, 0.5, '#7a4a1e'); hpx(x - 4, y - 8, q*1.5, 10, '#7a4a1e'); hpx(x + 4 - q, y - 8, q*1.5, 10, '#7a4a1e'); for (let k = 0; k < 8; k++) { hpx(x - 4 + k, y - 8 + k*1.25, 1, 0.5, 'rgba(255,220,160,.35)'); }   // 門板與斜撐
+  } else if (b.type === 'market') {
+    for (let i = 0; i < 14; i++) hpx(x - 14 + i*2, y - 12.2, 2, 0.9 + (i % 2)*0.4, i % 2 ? '#ffffff' : '#e23b3b');   // 遮陽棚的波浪邊
+    for (let i = 0; i < 12; i++) hpx(x - 11 + i*1.85, y - 4, q, 5, D); hpx(x - 11, y + 0.6, 22, 0.6, DD);
+    for (const [fx, col] of [[-8, '#e23b3b'], [-2, '#f0c040'], [4, '#4cba6a']]) { hEll(x + fx + 1.5, y - 5.2, 1.4, 1.1, col); hpx(x + fx + 1.2, y - 6.7, q*2, 0.8, '#5d3614'); hpx(x + fx + 0.6, y - 6, 0.7, 0.4, 'rgba(255,255,255,.5)'); }
+  } else if (b.type === 'mill') {
+    for (let r = 0; r < 7; r++) hpx(x - 6, y - 13 + r*2.3, 12, q, D); roof(x - 8, y - 19, 16, 5); hpx(x - 2, y - 6, 4, 0.5, '#7a4a1e');
+    hpx(x - 1.2, y - 12.2, 2.4, 2.2, 'rgba(120,190,255,.6)'); hpx(x - 1.2 - 0.4, y - 12.2, 3.2, 0.4, '#5b3a12');
+  } else if (b.type === 'library') {
+    for (let i = 0; i < 4; i++) { hpx(x - 10 + i*5, y - 9, 3, 0.5, 'rgba(255,255,255,.35)'); hpx(x - 10 + i*5, y - 2.5, 3, 0.5, DD); }
+    roof(x - 15, y - 17, 30, 6); roof(x - 11, y - 21, 22, 4); hpx(x - 13, y + 0.8, 26, 0.7, 'rgba(96,96,108,.6)');
+  } else if (b.type === 'monument') {
+    for (let r = 0; r < 9; r++) hpx(x - 6, y - 26 + r*2.4, 12, q, 'rgba(0,0,0,.2)'); hpx(x - 6, y - 26, 1.4, 22, 'rgba(255,255,255,.18)'); hpx(x + 4.6, y - 26, 1.4, 22, 'rgba(0,0,0,.22)');
+    hpx(x - 8.5, y - 0.6, 17, 0.8, 'rgba(0,0,0,.3)');
+  } else if (b.type === 'fire') {
+    for (let i = 0; i < 6; i++) hEll(x - 5 + i*2, y - 1, 1, 0.8, i % 2 ? '#6b6b78' : '#8b8b98');   // 圍火的石頭
+  }
+}
+function drawTreeHi(n) {   // 樹：葉叢的明暗斑塊、樹皮縱紋、根部與草叢；冬天換成枝上的積雪
+  const x = Math.round(n.x), y = Math.round(n.y), T = SEA.t, se = season(), q = 1/R, cx = x, cy = y - 16;
+  hpx(x - 3, y - 1, 6, 1.2, 'rgba(60,35,15,.5)'); hpx(x - 1.6, y - 9, q, 9, 'rgba(0,0,0,.3)'); hpx(x + 0.6, y - 9, q, 8, 'rgba(255,220,170,.25)');
+  for (const gx of [-5, -3, 3.5, 5]) { hpx(x + gx, y - 1.4, q*1.5, 1.6, '#3a8a45'); hpx(x + gx + 0.6, y - 1, q*1.5, 1.2, '#2f7a3a'); }
+  if (se === 3) { for (let k = 0; k < 16; k++) { const h = hh2(x + k*13, y + k*7); hpx(cx - 6 + (h % 120)/10, cy - 4 + ((h >> 8) % 60)/10, 0.9, 0.5, 'rgba(255,255,255,.85)'); } return; }
+  for (let k = 0; k < 34; k++) {   // 位置固定（依樹的座標決定）的葉叢斑塊
+    const h = hh2(x*7 + k*31, y*5 + k*17), a = (h % 628)/100, r = Math.sqrt(((h >> 10) % 100)/100), px0 = cx + Math.cos(a)*r*7.2, py0 = cy + Math.sin(a)*r*5.2;
+    hEll(px0, py0, 0.9 + (h >> 4) % 3*0.3, 0.6 + (h >> 6) % 3*0.2, k % 3 ? 'rgba(255,255,220,.22)' : 'rgba(10,30,10,.22)');
+  }
+  if (n.g >= 1 && se === 0) for (let k = 0; k < 8; k++) { const h = hh2(x + k*9, y*3 + k); hEll(cx - 6 + (h % 120)/10, cy - 4 + ((h >> 8) % 90)/10, 0.55, 0.5, 'rgba(255,196,214,.9)'); }   // 春天：櫻花瓣
+}
 function drawCreature(c, t) {
   const adult = c.age >= 25, bob = c.st === 'walk' ? (Math.floor(t*8) % 2) : 0, jump = c.bounce > 0 ? -2 : 0; if (c.bounce > 0) c.bounce -= 0.016;
   const sleeping = c.st === 'sleep';
@@ -1597,12 +1654,12 @@ function render(t) {
   const vis = o => o.x >= vx0 && o.x <= vx1 && o.y >= vy0 && o.y <= vy1;   // 視野外的東西不畫
   for (const n of S.nodes) if (vis(n)) items.push({ y: n.y, f: () => {
     const x = Math.round(n.x), y = Math.round(n.y);
-    if (n.type === 'tree') { if (lod === 0) drawTreeLo(n); else if (R > 1) hiDraw(x - 12, y - 26, 24, 30, `t|${seN}|${x},${y}|${n.g < 1 ? Math.round(n.g*4) : 5}|${Math.min(n.apple, 4)}`, () => drawTree(n)); else drawTree(n); }
+    if (n.type === 'tree') { if (lod === 0) drawTreeLo(n); else if (R > 1) hiDraw(x - 12, y - 26, 24, 30, `t|${seN}|${x},${y}|${n.g < 1 ? Math.round(n.g*4) : 5}|${Math.min(n.apple, 4)}`, () => drawTree(n)), (n.g === undefined || n.g >= 1) && drawTreeHi(n); else drawTree(n); }
     else if (R > 1) hiDraw(x - 14, y - 17, 28, 21, `r|${seN}|${x},${y}|${Math.min(n.stone, 3)}`, () => drawRock(n)); else drawRock(n); } });
   for (const b of S.builds) if (vis(b)) items.push({ y: b.y, f: () => {
     if (lod === 0) return drawBuildLo(b, t); if (R === 1) return drawBuild(b, t);
     const bx = BOX[b.type] || [-20, -30, 40, 40], lit = darkness() > 0.5 && b.occ && b.occ.length ? 1 : 0, tb = ['fire', 'mill', 'hut', 'house'].includes(b.type) ? Math.floor(t*4) % 16 : 0;
-    hiDraw(Math.round(b.x) + bx[0], Math.round(b.y) + bx[1], bx[2], bx[3], b.type === 'monument' ? null : `b|${b.type}|${Math.round(b.x)},${Math.round(b.y)}|${lit}|${seN}|${b.type === 'orchard' ? Math.round((b.g || 0)*8) : 0}|${tb}|${b.dx || 0},${b.dy || 0}`, () => drawBuild(b, t)); } });
+    hiDraw(Math.round(b.x) + bx[0], Math.round(b.y) + bx[1], bx[2], bx[3], b.type === 'monument' ? null : `b|${b.type}|${Math.round(b.x)},${Math.round(b.y)}|${lit}|${seN}|${b.type === 'orchard' ? Math.round((b.g || 0)*8) : 0}|${tb}|${b.dx || 0},${b.dy || 0}`, () => drawBuild(b, t)); drawBuildHi(b, t); } });
   if (S.plan) items.push({ y: S.plan.y, f: () => drawPlan(S.plan) });
   items.push({ y: PILE.y, f: drawPile });
   for (const a of S.apples) items.push({ y: a.y, f: () => drawApple(a) });
