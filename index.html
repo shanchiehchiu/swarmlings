@@ -409,9 +409,22 @@ function rebuildRoads() {   // 畫廣場、墓園與所有道路格
   for (let y = -23; y <= 23; y++) { const hw = Math.round(46*Math.sqrt(1 - (y/23)**2)); g.fillRect(PILE.x - hw, PILE.y + y, hw*2, 1); }   // 逐行畫橢圓，邊緣才是像素階梯
   g.fillStyle = '#a17847'; for (let i = 0; i < 150; i++) g.fillRect(PILE.x - 44 + Math.floor(rng()*88), PILE.y - 21 + Math.floor(rng()*42), 1, 1);
   const gy = ROAD.gy; clearLand(gy.x + 22, gy.y + 16, 34); g.fillStyle = '#8a9a5a'; g.fillRect(gy.x - 5, gy.y - 5, 56, 42); g.fillStyle = '#9a8a70'; g.fillRect(gy.x - 6, gy.y - 6, 58, 1); g.fillRect(gy.x - 6, gy.y + 37, 58, 1); g.fillRect(gy.x - 6, gy.y - 6, 1, 44); g.fillRect(gy.x + 51, gy.y - 6, 1, 44);   // 墓園：圍起來的草地
-  for (let i = 0; i < RD.length; i++) if (RD[i]) {
-    const x = (i % GW)*CS, y = ((i/GW) | 0)*CS; if (isWater(x + 2, y + 2)) continue;
-    const h = (Math.imul(i, 2654435761) >>> 28), j = (h & 1); g.fillStyle = '#9a6f40'; g.fillRect(x - 1, y - 1 + j, CS + 2, CS + 2 - j); g.fillStyle = h < 5 ? '#b58a55' : '#c39560'; g.fillRect(x, y, CS, CS);   // 路：外圈深一點的路肩，中間亮一點的路面（約 6px 寬）
+  // 道路分三步畫：先補斜向缺口、再畫整條路肩、最後畫路面，路面之間才不會有被路肩切斷的接縫
+  const cells = [];
+  for (let i = 0; i < RD.length; i++) if (RD[i] && !isWater((i % GW)*CS + 2, ((i/GW) | 0)*CS + 2)) cells.push(i);
+  const has = i => i >= 0 && i < RD.length && RD[i] === 1;
+  const fill = [];   // 斜向相鄰、但上下左右都沒路的格子，補一格讓路連成一條
+  for (const i of cells) for (const d of [GW + 1, GW - 1]) {
+    if (!has(i + d) || (i % GW === 0 && d === GW - 1) || (i % GW === GW - 1 && d === GW + 1)) continue;
+    if (!has(i + 1) && !has(i + GW) && d === GW + 1) fill.push(i + 1);
+    if (!has(i - 1) && !has(i + GW) && d === GW - 1) fill.push(i - 1);
+  }
+  const all = cells.concat(fill.filter(i => i >= 0 && i < RD.length && !isWater((i % GW)*CS + 2, ((i/GW) | 0)*CS + 2)));
+  g.fillStyle = '#9a6f40';
+  for (const i of all) g.fillRect((i % GW)*CS - 1, ((i/GW) | 0)*CS - 1, CS + 2, CS + 2);
+  for (const i of all) {
+    const x = (i % GW)*CS, y = ((i/GW) | 0)*CS, h = (Math.imul(i, 2654435761) >>> 28);
+    g.fillStyle = h < 5 ? '#b58a55' : '#c39560'; g.fillRect(x, y, CS, CS);
     if (h > 12) { g.fillStyle = '#c99d64'; g.fillRect(x + (h & 3), y + ((h >> 2) & 3), 1, 1); }   // 路面的碎石感
   }
 }
