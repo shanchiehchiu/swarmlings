@@ -266,7 +266,9 @@ const EYE = { cx: W/2, cy: HORIZON + (H - HORIZON)/2 + 4, A: 150, B: 62, ir: 34,
 let SEA = null;   // 目前季節的配色（buildGround 時使用）
 const WORLD = { seed: 0, field: new Float32Array(TW*TH), thr: 0.35, water: new Uint8Array(TW*TH), pal: PALS[0], shore: [], ripples: [], trees: [], rocks: [] };
 const ground = document.createElement('canvas'); ground.width = W; ground.height = H;   // 地形（生成後畫一次）
-const pathC = document.createElement('canvas'); pathC.width = W; pathC.height = H;      // 道路（隨建築增加）
+const pathC = document.createElement('canvas'); pathC.width = W; pathC.height = H;      // 道路層（廣場＋墓園＋道路的合成，標準畫質直接貼這張）
+const baseC = document.createElement('canvas'); baseC.width = W; baseC.height = H;      // 只有廣場與墓園（高解析度時用這張，道路另外用平滑輪廓畫）
+const roadC = document.createElement('canvas'); roadC.width = W; roadC.height = H;      // 只有道路格
 const isWater = (x, y) => { const tx = Math.floor(x/T8), ty = Math.floor(y/T8); return tx >= 0 && ty >= 0 && tx < TW && ty < TH && WORLD.water[ty*TW + tx] === 1; };
 
 function genWorld(seed) {
@@ -404,11 +406,13 @@ function connectRoad(b) {   // 從建築門口走到最近的路（Dijkstra，�
 }
 function rebuildRoads() {   // 畫廣場、墓園與所有道路格
   pVer++;
-  const g = pathC.getContext('2d'), rng = mulberry32(WORLD.seed + 7);
-  g.clearRect(0, 0, W, H); g.fillStyle = '#b58a55';
+  const g = baseC.getContext('2d'), rd = roadC.getContext('2d'), rng = mulberry32(WORLD.seed + 7);
+  g.clearRect(0, 0, W, H); rd.clearRect(0, 0, W, H); g.fillStyle = '#b58a55';
   for (let y = -23; y <= 23; y++) { const hw = Math.round(46*Math.sqrt(1 - (y/23)**2)); g.fillRect(PILE.x - hw, PILE.y + y, hw*2, 1); }   // 逐行畫橢圓，邊緣才是像素階梯
   g.fillStyle = '#a17847'; for (let i = 0; i < 150; i++) g.fillRect(PILE.x - 44 + Math.floor(rng()*88), PILE.y - 21 + Math.floor(rng()*42), 1, 1);
   const gy = ROAD.gy; clearLand(gy.x + 22, gy.y + 16, 34); g.fillStyle = '#8a9a5a'; g.fillRect(gy.x - 5, gy.y - 5, 56, 42); g.fillStyle = '#9a8a70'; g.fillRect(gy.x - 6, gy.y - 6, 58, 1); g.fillRect(gy.x - 6, gy.y + 37, 58, 1); g.fillRect(gy.x - 6, gy.y - 6, 1, 44); g.fillRect(gy.x + 51, gy.y - 6, 1, 44);   // 墓園：圍起來的草地
+  for (let n = 0; n < 420; n++) { const x = gy.x - 4 + Math.floor(rng()*52), y = gy.y - 4 + Math.floor(rng()*40), q = rng(); g.fillStyle = q < 0.45 ? '#7f8f50' : q < 0.8 ? '#95a562' : q < 0.95 ? '#a6b56e' : '#e8d9a0'; g.fillRect(x, y, 1, q < 0.8 && rng() < 0.4 ? 2 : 1); }   // 草地的斑駁、草葉與小野花
+  g.fillStyle = '#6f7f47'; for (let x = gy.x - 6; x < gy.x + 52; x += 3) { g.fillRect(x, gy.y - 7, 2, 2); g.fillRect(x + 1, gy.y + 36, 2, 2); } for (let y = gy.y - 6; y < gy.y + 38; y += 3) { g.fillRect(gy.x - 7, y, 2, 2); g.fillRect(gy.x + 51, y + 1, 2, 2); }   // 圍籬邊的矮灌木
   // 道路分三步畫：先補斜向缺口、再畫整條路肩、最後畫路面，路面之間才不會有被路肩切斷的接縫
   const cells = [];
   for (let i = 0; i < RD.length; i++) if (RD[i] && !isWater((i % GW)*CS + 2, ((i/GW) | 0)*CS + 2)) cells.push(i);
@@ -420,13 +424,38 @@ function rebuildRoads() {   // 畫廣場、墓園與所有道路格
     if (!has(i - 1) && !has(i + GW) && d === GW - 1) fill.push(i - 1);
   }
   const all = cells.concat(fill.filter(i => i >= 0 && i < RD.length && !isWater((i % GW)*CS + 2, ((i/GW) | 0)*CS + 2)));
-  g.fillStyle = '#9a6f40';
-  for (const i of all) g.fillRect((i % GW)*CS - 1, ((i/GW) | 0)*CS - 1, CS + 2, CS + 2);
+  rd.fillStyle = '#9a6f40';
+  for (const i of all) rd.fillRect((i % GW)*CS - 1, ((i/GW) | 0)*CS - 1, CS + 2, CS + 2);
   for (const i of all) {
     const x = (i % GW)*CS, y = ((i/GW) | 0)*CS, h = (Math.imul(i, 2654435761) >>> 28);
-    g.fillStyle = h < 5 ? '#b58a55' : '#c39560'; g.fillRect(x, y, CS, CS);
-    if (h > 12) { g.fillStyle = '#c99d64'; g.fillRect(x + (h & 3), y + ((h >> 2) & 3), 1, 1); }   // 路面的碎石感
+    rd.fillStyle = h < 5 ? '#b58a55' : '#c39560'; rd.fillRect(x, y, CS, CS);
+    if (h > 12) { rd.fillStyle = '#c99d64'; rd.fillRect(x + (h & 3), y + ((h >> 2) & 3), 1, 1); }   // 路面的碎石感
   }
+  const pc = pathC.getContext('2d'); pc.clearRect(0, 0, W, H); pc.drawImage(baseC, 0, 0); pc.drawImage(roadC, 0, 0);
+}
+function boxBlur(m, w, h, r) {   // 把 0/255 的遮罩做三次方框模糊（近似高斯），之後再切門檻，就能把階梯邊緣磨成圓滑曲線
+  const t = new Uint8Array(m.length), acc = new Int32Array(Math.max(w, h) + 2*r + 2);
+  for (let pass = 0; pass < 3; pass++) {
+    for (let y = 0; y < h; y++) { let sum = 0; const o = y*w;   // 水平
+      for (let x = -r; x <= r; x++) sum += m[o + Math.min(w - 1, Math.max(0, x))];
+      for (let x = 0; x < w; x++) { t[o + x] = sum/(2*r + 1); sum += m[o + Math.min(w - 1, x + r + 1)] - m[o + Math.max(0, x - r)]; } }
+    for (let x = 0; x < w; x++) { let sum = 0;   // 垂直
+      for (let y = -r; y <= r; y++) sum += t[Math.min(h - 1, Math.max(0, y))*w + x];
+      for (let y = 0; y < h; y++) { m[y*w + x] = sum/(2*r + 1); sum += t[Math.min(h - 1, y + r + 1)*w + x] - t[Math.max(0, y - r)*w + x]; } }
+  }
+}
+function smoothRoad(k) {   // 高解析度的道路：路肩與路面各做一張放大的遮罩、模糊後切門檻，斜路與轉彎就變成圓滑的曲線
+  const cw = W*k, ch = H*k, src = roadC.getContext('2d').getImageData(0, 0, W, H).data, all = new Uint8Array(cw*ch), top = new Uint8Array(cw*ch);
+  for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) { const si = (((y/k) | 0)*W + ((x/k) | 0))*4; if (src[si + 3]) { all[y*cw + x] = 255; if (src[si] >= 168) top[y*cw + x] = 255; } }
+  const r = Math.round(k*1.6); boxBlur(all, cw, ch, r); boxBlur(top, cw, ch, Math.max(1, r - Math.round(k*0.5)));
+  const out = new Uint8ClampedArray(cw*ch*4);
+  for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) {
+    const j = y*cw + x; if (all[j] < 128) continue; const i = j*4, n = (((x*73856093) ^ (y*19349663)) >>> 0) % 5 - 2;
+    if (top[j] < 128) { out[i] = 154 + n; out[i + 1] = 111 + n; out[i + 2] = 64 + n; out[i + 3] = 255; continue; }   // 路肩
+    let si = (((y/k) | 0)*W + ((x/k) | 0))*4, ok = src[si + 3] && src[si] >= 168;   // 路面：用原本那格的顏色，才保有碎石感
+    out[i] = (ok ? src[si] : 181) + n; out[i + 1] = (ok ? src[si + 1] : 138) + n; out[i + 2] = (ok ? src[si + 2] : 85) + n; out[i + 3] = 255;
+  }
+  const t = document.createElement('canvas'); t.width = cw; t.height = ch; t.getContext('2d').putImageData(new ImageData(out, cw, ch), 0, 0); return t;
 }
 function loadRoads() {   // 載入：優先用存檔的道路格；舊存檔沒有就依建築順序重新走一遍
   RD.fill(0);
@@ -824,7 +853,7 @@ let hiG = null, hiP = null, gVer = 0, pVer = 0, hiGv = -1, hiPv = -1, hiR = 1;
 function hiLayers() {   // 地面與道路的高解析版本：地面或道路一改變才重算
   if (hiR !== R) { hiR = R; hiGv = hiPv = -1; }
   if (hiGv !== gVer) { hiG = refine(ground.getContext('2d').getImageData(0, 0, W, H), R, 'ground'); hiGv = gVer; }
-  if (hiPv !== pVer) { hiP = refine(pathC.getContext('2d').getImageData(0, 0, W, H), R, 'path'); hiPv = pVer; }
+  if (hiPv !== pVer) { hiP = refine(baseC.getContext('2d').getImageData(0, 0, W, H), R, 'path'); hiP.getContext('2d').drawImage(smoothRoad(R), 0, 0); hiPv = pVer; }
 }
 const BOX = { hut: [-16, -40, 32, 45], house: [-16, -40, 32, 45], fire: [-8, -16, 16, 20], orchard: [-22, -16, 44, 30], library: [-18, -26, 36, 32], monument: [-12, -36, 24, 44], well: [-10, -20, 20, 26], storage: [-16, -24, 32, 30], market: [-16, -22, 32, 28], mill: [-14, -30, 28, 36], dock: [-28, -14, 56, 44] };
 let S = null, speed = 1, tool = 'feed', muted = false, paused = false;
