@@ -8,6 +8,10 @@ A pixel-art virtual-pet game that quietly turns into a civilization simulator. Y
 
 Single HTML file, zero dependencies, no build step. Open `index.html` and play. UI in English and Traditional Chinese (auto-detected, switch in the menu).
 
+![demo](docs/demo.gif)
+
+_A single creature becomes a village in about 15 seconds of time-lapse (roads, farms, seasons, generations)._
+
 ![settlement](docs/settlement.png)
 
 | | |
