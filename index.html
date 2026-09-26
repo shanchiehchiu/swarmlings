@@ -363,22 +363,32 @@ function genRoads(seed) {
   const ok = (x, y) => x >= 14 && x <= W - 14 && y >= HORIZON + 14 && y <= H - 8 && !isWater(x, y);
   const at = (a, r) => [PILE.x + Math.cos(a)*r, PILE.y + Math.sin(a)*r*0.75];
   let id = 0;
-  const radial = (x, y, a) => {   // 沿方向前進，帶一點蜿蜒；碰到水或邊界就停
-    id++; const ph = rng()*6;
-    let wet = 0;   // 碰到湖就直接跨過去（不畫路）；水太寬或出界才停
-    for (let i = 0; i < 80; i++) {
-      a += Math.sin(ph + i*0.22)*0.045; x += Math.cos(a)*6; y += Math.sin(a)*4.5;
+  // 有機的路網：不等角的主幹道（各自蜿蜒、長度不一）、半途分岔的小巷、半徑起伏且有缺口的環路
+  const nx0 = rng()*300, ny0 = rng()*300, branches = [];
+  const radial = (x, y, a, maxN = 80, branchy = true) => {   // 沿方向前進，兩種頻率的蜿蜒；碰到水就跨過去（不畫路），水太寬或出界才停
+    const my = ++id, ph = rng()*6, ph2 = rng()*6, amp = 0.06 + rng()*0.07; let wet = 0, since = 0;
+    for (let i = 0; i < maxN; i++) {
+      a += Math.sin(ph + i*0.17)*amp*0.6 + Math.sin(ph2 + i*0.43)*amp*0.4 + (rng() - 0.5)*0.05; x += Math.cos(a)*6; y += Math.sin(a)*4.5;
       if (x < 14 || x > W - 14 || y < HORIZON + 14 || y > H - 8) break;
-      if (isWater(x, y)) { if (++wet > 7) break; continue; } wet = 0; pts.push({ x, y, id, d: eDist(x, y) });
+      if (isWater(x, y)) { if (++wet > 7) break; continue; } wet = 0; pts.push({ x, y, id: my, d: eDist(x, y) }); since++;
+      if (branchy && i > 6 && since > 7 && rng() < 0.09) { since = 0; branches.push([x, y, a + (rng() < 0.5 ? -1 : 1)*(0.9 + rng()*0.6)]); }   // 分岔出一條短巷
     }
   };
-  const N = 8, a0 = rng()*Math.PI*2;
-  for (let i = 0; i < N; i++) { const a = a0 + i*Math.PI*2/N + (rng() - 0.5)*0.3, [x, y] = at(a, 40); radial(x, y, a); }
-  for (const R of [70, 118, 166]) {   // 環路：遇到水就斷開
-    const n = Math.ceil(Math.PI*2*R*0.87/6); let cur = ++id;
-    for (let i = 0; i < n; i++) { const [x, y] = at(a0 + i/n*Math.PI*2, R); if (ok(x, y)) pts.push({ x, y, id: cur, d: eDist(x, y) }); else cur = ++id; }
+  const N = 6 + Math.floor(rng()*3), a0 = rng()*Math.PI*2;
+  for (let i = 0; i < N; i++) { const a = a0 + i*Math.PI*2/N + (rng() - 0.5)*0.8, [x, y] = at(a, 38 + rng()*8); radial(x, y, a, 45 + Math.floor(rng()*40)); }
+  for (const R0 of [70, 118, 166]) {   // 環路：半徑隨角度起伏、圓心略偏、留幾個缺口，遇到水就斷開
+    const R = R0 + (rng() - 0.5)*14, ox = (rng() - 0.5)*12, oy = (rng() - 0.5)*8, n = Math.ceil(Math.PI*2*R*0.87/6), gaps = Array.from({ length: 1 + Math.floor(rng()*2) }, () => [rng()*Math.PI*2, 0.35 + rng()*0.7]);
+    let cur = ++id, inGap = false;
+    for (let i = 0; i < n; i++) {
+      const th = a0 + i/n*Math.PI*2, g = gaps.some(([s0, w]) => ((th - s0) % (Math.PI*2) + Math.PI*2) % (Math.PI*2) < w);
+      if (g) { if (!inGap) { cur = ++id; inGap = true; } continue; } inGap = false;
+      const wob = 1 + 0.2*(vnoise(Math.cos(th)*1.4 + nx0, Math.sin(th)*1.4 + ny0, seed + Math.round(R0)) - 0.5)*2, [x, y] = at(th, R*wob);
+      if (ok(x + ox, y + oy)) pts.push({ x: x + ox, y: y + oy, id: cur, d: eDist(x + ox, y + oy) }); else cur = ++id;
+    }
   }
-  for (let i = 0; i < N; i++) { const a = a0 + (i + 0.5)*Math.PI*2/N, [x, y] = at(a, 70); radial(x, y, a); }   // 次幹道：從第一圈環路再往外
+  const N2 = 5 + Math.floor(rng()*4);
+  for (let i = 0; i < N2; i++) { const a = a0 + (i + 0.2 + rng()*0.6)*Math.PI*2/N2, [x, y] = at(a, 68 + rng()*10); radial(x, y, a, 30 + Math.floor(rng()*40)); }   // 次幹道：從第一圈環路再往外
+  for (const [x, y, a] of branches) radial(x, y, a, 6 + Math.floor(rng()*10), false);
   const seen = new Set();   // 沿每條路每隔約 22px，在路的兩側各留一塊地段
   const byId = new Map(); for (const p of pts) (byId.get(p.id) || byId.set(p.id, []).get(p.id)).push(p);
   for (const line of byId.values()) {
