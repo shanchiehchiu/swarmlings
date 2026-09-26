@@ -1456,6 +1456,19 @@ function drawBuildHi(b, t) {
     for (let i = 0; i < 8; i++) hpx(x - 8.5 + i*2.2, y - 8, q, 9.6, D);   // 木板牆縫
     hpx(x - 2.4, y - 4.4, 5, 0.4, '#4a2c12'); hpx(x + 1.6, y - 1.4, 0.6, 0.6, '#f0d060'); hpx(x - 9, y + 1.4, 18, 0.7, 'rgba(90,70,40,.5)');
   } else if (b.type === 'orchard') {
+    const g = b.g || 0, se = season(), ripe = g >= 1;
+    for (const yy of [-7, -1, 5]) {   // 先重畫土壤帶，蓋掉低解析度的方塊作物，再種上細緻的植株
+      hpx(x - 17, y + yy - 2.5, 34, 7, se === 3 ? '#a89a8a' : '#8a5f34'); hpx(x - 17, y + yy + 4.1, 34, 0.5, se === 3 ? '#8d8072' : '#6b4526'); hpx(x - 17, y + yy - 2.5, 34, q*1.5, 'rgba(255,220,170,.18)');
+      for (let i = 0; i < 6; i++) {
+        const cx = x - 14 + i*6, by = y + yy + 4;
+        if (se === 3) { hEll(cx, by - 0.6, 1.2, 0.5, 'rgba(255,255,255,.85)'); continue; }
+        if (g < 0.25) { hEll(cx - 0.4, by - 0.7, 0.5, 0.3, '#7ad08a'); hEll(cx + 0.4, by - 0.9, 0.5, 0.3, '#5cc474'); }
+        else if (g < 0.6) { hpx(cx - q, by - 2.6, q*2, 2.6, '#4cba6a'); hEll(cx - 1, by - 1.7, 1.0, 0.36, '#4cba6a'); hEll(cx + 1, by - 2.2, 1.0, 0.36, '#3aa055'); }
+        else if (!ripe) { hpx(cx - q, by - 4.6, q*2, 4.6, '#3aa055'); for (let k = 0; k < 3; k++) { hEll(cx - 1.1, by - 1.2 - k*1.2, 1.1, 0.36, '#3aa055'); hEll(cx + 1.1, by - 1.8 - k*1.2, 1.1, 0.36, '#4cba6a'); } hEll(cx, by - 5.2, 0.42, 1.0, g > 0.85 ? '#b9c24a' : '#8bc95a'); }
+        else { hpx(cx - q, by - 4.8, q*2, 4.8, '#c9a83a'); hEll(cx - 1.1, by - 2.0, 1.1, 0.34, '#d9b13c'); hEll(cx + 1.1, by - 3.0, 1.1, 0.34, '#d9b13c');
+          hEll(cx, by - 6.2, 0.62, 1.9, '#e8c34a'); for (let k = 0; k < 4; k++) { hpx(cx - 0.35, by - 7.3 + k*0.9, 0.3, 0.3, '#f6dc7a'); hpx(cx + 0.1, by - 6.9 + k*0.9, 0.3, 0.3, '#c9a83a'); } hpx(cx - 0.4, by - 8.5, q, 1.3, '#f0d878'); hpx(cx + 0.3, by - 8.5, q, 1.3, '#f0d878'); }
+      }
+    }
     for (const yy of [-8, -2, 4]) hpx(x - 17, y + yy + 4.6, 34, q*1.5, 'rgba(0,0,0,.25)');   // 田壟
     for (let k = 0; k < 40; k++) { const h = hh2(x*31 + k, y*17 + k*7); hpx(x - 17 + (h % 340)/10, y - 8 + ((h >> 9) % 170)/10, 0.5, 0.4, h & 1 ? 'rgba(70,45,20,.6)' : 'rgba(190,150,100,.5)'); }   // 土塊
     for (const fx of [-20, -7, 6, 19]) { hpx(x + fx - 0.6, y - 13.6, 1.8, 0.6, '#7a4a2a'); hpx(x + fx - 0.3, y - 11, q, 3, 'rgba(0,0,0,.3)'); }   // 木樁
@@ -1489,7 +1502,7 @@ function drawTreeHi(n) {   // 樹：葉叢的明暗斑塊、樹皮縱紋、根�
   if (se === 3) { for (let k = 0; k < 16; k++) { const h = hh2(x + k*13, y + k*7); hpx(cx - 6 + (h % 120)/10, cy - 4 + ((h >> 8) % 60)/10, 0.9, 0.5, 'rgba(255,255,255,.85)'); } return; }
   for (let k = 0; k < 34; k++) {   // 位置固定（依樹的座標決定）的葉叢斑塊
     const h = hh2(x*7 + k*31, y*5 + k*17), a = (h % 628)/100, r = Math.sqrt(((h >> 10) % 100)/100), px0 = cx + Math.cos(a)*r*7.2, py0 = cy + Math.sin(a)*r*5.2;
-    hEll(px0, py0, 0.9 + (h >> 4) % 3*0.3, 0.6 + (h >> 6) % 3*0.2, k % 3 ? 'rgba(255,255,220,.22)' : 'rgba(10,30,10,.22)');
+    hEll(px0, py0, 0.9 + (h >> 4) % 3*0.3, 0.6 + (h >> 6) % 3*0.2, k % 3 ? 'rgba(255,255,220,.16)' : 'rgba(10,30,10,.13)');
   }
   if (n.g >= 1 && se === 0) for (let k = 0; k < 8; k++) { const h = hh2(x + k*9, y*3 + k); hEll(cx - 6 + (h % 120)/10, cy - 4 + ((h >> 8) % 90)/10, 0.55, 0.5, 'rgba(255,196,214,.9)'); }   // 春天：櫻花瓣
 }
@@ -1560,6 +1573,44 @@ function rockSprite(n, snow) {
   const out = document.createElement('canvas'); out.width = x1 - x0 + 1; out.height = y1 - y0 + 1; out.getContext('2d').drawImage(cv2, -x0, -y0);
   hit = { c: out, w: out.width, h: out.height }; rockCache.set(key, hit); return hit;
 }
+function rockSpriteHi(n, snow, K) {   // 與低解析版同一組亂數：形狀一樣，但以 K 倍解析度重新柵格化，加入漸變明暗、岩層紋、裂縫、顆粒、苔蘚或積雪
+  const key = Math.round(n.x) + ',' + Math.round(n.y) + (snow ? 's' : '') + '@' + K; let hit = rockCache.get(key); if (hit) return hit;
+  const r = mulberry32((Math.round(n.x)*73856093) ^ (Math.round(n.y)*19349663) ^ 0x51ed), kind = r();
+  const w = 11 + Math.floor(r()*12), h = Math.max(6, kind < 0.3 ? Math.round(w*(0.35 + r()*0.15)) : kind > 0.7 ? Math.round(w*(0.9 + r()*0.3)) : Math.round(w*(0.55 + r()*0.2)));
+  const nv = 5 + Math.floor(r()*3), T = ROCK_TINT[Math.floor(r()*3)], W2 = (w + 2)*K, H2 = (h + 2)*K, cx = W2/2, cy = H2/2;
+  const vs = []; for (let i = 0; i < nv; i++) { const a = (i/nv)*Math.PI*2 + (r() - 0.5)*0.7, rad = 0.72 + r()*0.28; vs.push({ a, x: cx + Math.cos(a)*rad*w/2*K, y: cy + Math.sin(a)*rad*h/2*K }); }
+  vs.sort((p, q) => p.a - q.a);
+  const inside = (x, y) => { let c = false; for (let i = 0, j = nv - 1; i < nv; j = i++) { const A = vs[i], B = vs[j]; if ((A.y > y) !== (B.y > y) && x < (B.x - A.x)*(y - A.y)/(B.y - A.y) + A.x) c = !c; } return c; };
+  const inn = new Uint8Array(W2*H2); for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) inn[y*W2 + x] = inside(x + 0.5, y + 0.5) ? 1 : 0;
+  const shade = [T.D, T.d, mixc(T.d, T.a, 0.5), T.a, mixc(T.a, T.h, 0.5), T.h];
+  const litAt = (x, y) => {
+    let a = Math.atan2(y + 0.5 - cy, x + 0.5 - cx); if (a < vs[0].a) a += Math.PI*2; let f = nv - 1; for (let i = 0; i < nv - 1; i++) if (a >= vs[i].a && a < vs[i + 1].a) f = i;
+    const A = vs[f].a, B = f === nv - 1 ? vs[0].a + Math.PI*2 : vs[f + 1].a, m = (A + B)/2;
+    return (Math.cos(m)*-0.6 + Math.sin(m)*-0.8)*0.7 + (y < cy ? 0.2 : -0.05) - ((x - cx)/W2)*0.25 + ((y - cy)/H2)*-0.2 + 0.12;   // 切面朝向 + 平滑的整體明暗
+  };
+  const cv2 = document.createElement('canvas'); cv2.width = W2; cv2.height = H2; const q = cv2.getContext('2d'), P = (x, y, col) => { q.fillStyle = col; q.fillRect(x, y, 1, 1); };
+  const rw = Math.max(1, K >> 1); let x0 = W2, x1 = -1, y0 = H2, y1 = -1; const top = new Int32Array(W2).fill(H2);
+  for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) if (inn[y*W2 + x]) {
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); if (y < top[x]) top[x] = y;
+    const edge = !(y - rw >= 0 && inn[(y - rw)*W2 + x] && y + rw < H2 && inn[(y + rw)*W2 + x] && x - rw >= 0 && inn[y*W2 + x - rw] && x + rw < W2 && inn[y*W2 + x + rw]);
+    if (edge) { P(x, y, '#33394a'); continue; }
+    const hz = hh2(x, y), l = litAt(x, y) + ((hz % 100)/100 - 0.5)*0.28, bi = l > 0.5 ? 5 : l > 0.3 ? 4 : l > 0.08 ? 3 : l > -0.12 ? 2 : l > -0.35 ? 1 : 0;   // 帶顆粒抖動的六階明暗
+    P(x, y, shade[bi]);
+    if (hz % 23 === 0) P(x, y, hz & 64 ? T.h : T.D);   // 礦物顆粒
+  }
+  const inR = (x, y) => x >= 0 && y >= 0 && x < W2 && y < H2 && inn[y*W2 + x];
+  for (let c = 0; c < 2 + (r() < 0.5 ? 1 : 0); c++) { const sl = (r() - 0.5)*0.5, yy0 = y0 + (y1 - y0)*(0.25 + c*0.25); q.fillStyle = 'rgba(0,0,0,.22)'; for (let x = x0 + rw; x < x1 - rw; x++) { const y = Math.round(yy0 + (x - x0)*sl); if (inR(x, y) && inR(x, y - rw) && inR(x, y + rw)) q.fillRect(x, y, 1, Math.max(1, K >> 2)); } }   // 岩層紋
+  for (let c = 0, nc = r() < 0.7 ? 1 + Math.floor(r()*2) : 0; c < nc; c++) { let x = x0 + Math.floor(r()*(x1 - x0)), y = y0 + Math.floor(r()*(y1 - y0)*0.6); q.fillStyle = 'rgba(20,24,34,.55)'; for (let i = 0; i < (4 + Math.floor(r()*4))*K; i++) { if (inR(x, y) && inR(x, y + 1)) q.fillRect(x, y, Math.max(1, K >> 2), 1); x += r() < 0.45 ? 0 : (r() < 0.5 ? -1 : 1); y += 1; } }   // 裂縫
+  if (snow) { for (let x = x0; x <= x1; x++) if (top[x] < H2) { const th = Math.round((3 + ((hh2(x >> 1, 7) % 5))*0.7)*K/4 + 1); for (let y = top[x]; y < top[x] + th && inR(x, y); y++) P(x, y, y === top[x] + th - 1 ? '#c9dcf0' : '#f6faff'); } }
+  else if (r() < 0.5) { const mx = x0 + Math.floor(r()*(x1 - x0)*0.8), tones = ['#4f7f3f', '#5f8f4a', '#7aa85a']; for (let y = y0; y < y0 + 3*K && y < H2; y++) for (let x = mx - 3*K; x <= mx + 3*K; x++) if (inR(x, y) && hh2(x, y) % 10 < 7 && Math.hypot(x - mx, (y - y0)*1.6) < 3.2*K) P(x, y, tones[hh2(x >> 1, y >> 1) % 3]); }   // 苔蘚
+  const out = document.createElement('canvas'); out.width = x1 - x0 + 1; out.height = y1 - y0 + 1; out.getContext('2d').drawImage(cv2, -x0, -y0);
+  hit = { c: out, w: out.width, h: out.height, k: K }; rockCache.set(key, hit); return hit;
+}
+function drawRockHi(n) {
+  const K = R, sp = rockSpriteHi(n, season() === 3, K), x = Math.round(n.x), y = Math.round(n.y), bw = sp.w/K, bh = sp.h/K;
+  hEll(x, y + 0.5, bw*0.5, 0.95, 'rgba(0,0,0,.28)'); ctx.drawImage(sp.c, x - bw/2, y - bh + 1, bw, bh);
+  for (let i = 0; i < Math.min(n.stone, 3); i++) hEll(x + bw/2 + 0.6 + (i % 2)*1.2, y - 0.6 - i*1.1, 0.6, 0.4, '#cfd6e0');   // 剩下的石料：腳邊的小碎石
+}
 function drawRock(n) {
   const sp = rockSprite(n, season() === 3), x = Math.round(n.x), y = Math.round(n.y);
   px(x - (sp.w >> 1), y, sp.w, 2, 'rgba(0,0,0,.28)'); ctx.drawImage(sp.c, x - (sp.w >> 1), y - sp.h + 1);   // 最下面一排像素貼在腳底線上，陰影從那裡往下露出來
@@ -1600,10 +1651,47 @@ function smoke(b, x, y, t) {   // 有人住的房子在傍晚與夜裡冒炊煙
   for (let i = 0; i < 3; i++) { const p = (t*0.5 + i/3 + (b.x % 7)/7) % 1; ctx.globalAlpha = 0.6*(1 - p); px(x + Math.sin(t + i*2)*1.5, y - p*14, 2, 2, '#dfe4ee'); }
   ctx.globalAlpha = 1;
 }
+function drawWaterHi(t) {   // 水面：飄動的波紋線、閃爍的亮點、岸邊的浪花；冬天換成冰裂紋
+  const q = 1/R, tx0 = Math.max(0, Math.floor(cam.x/T8)), tx1 = Math.min(TW - 1, Math.ceil((cam.x + W/cam.z)/T8)), ty0 = Math.max(0, Math.floor(cam.y/T8)), ty1 = Math.min(TH - 1, Math.ceil((cam.y + H/cam.z)/T8)), winter = season() === 3, wt = (a, b) => a >= 0 && b >= 0 && a < TW && b < TH && WORLD.water[b*TW + a] === 1;
+  for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
+    if (!wt(tx, ty)) continue; const X = tx*T8, Y = ty*T8;
+    for (let i = 0; i < 3; i++) { const h = hh2(tx*7 + i, ty*13 + i*5), wx = X + (h % 60)/10 + Math.sin(t*0.7 + (h & 255))*0.7, wy = Y + ((h >> 8) % 70)/10, wl = 1.2 + ((h >> 16) % 13)/10;
+      if (winter) hpx(wx, wy, wl*1.6, q, 'rgba(255,255,255,.4)'); else { hpx(wx, wy, wl, q*1.5, `rgba(255,255,255,${(0.22 + 0.18*Math.sin(t*1.6 + (h & 127))).toFixed(2)})`); hpx(wx + 0.3, wy + q*1.5, wl, q, 'rgba(20,50,120,.25)'); } }
+    const sp = hh2(tx, ty) + Math.floor(t*2); if (sp % 17 === 0) hpx(X + (sp % 70)/10, Y + ((sp >> 7) % 70)/10, q*2, q*2, '#ffffff');   // 閃光
+    if (!wt(tx, ty - 1)) for (let k = 0; k < T8; k++) hpx(X + k, Y + (Math.sin(t*1.2 + k*0.9 + tx)*0.15 + 0.15), 1, q*1.5, `rgba(255,255,255,${k % 2 ? 0.6 : 0.35})`);   // 浪花
+    if (!wt(tx, ty + 1)) for (let k = 0; k < T8; k++) hpx(X + k, Y + T8 - q*1.5 - (Math.sin(t*1.2 + k*0.9)*0.12 + 0.12), 1, q*1.5, `rgba(255,255,255,${k % 2 ? 0.55 : 0.3})`);
+    if (!wt(tx - 1, ty)) for (let k = 0; k < T8; k++) hpx(X + (Math.sin(t*1.2 + k*0.9 + ty)*0.12 + 0.12), Y + k, q*1.5, 1, `rgba(255,255,255,${k % 2 ? 0.55 : 0.3})`);
+    if (!wt(tx + 1, ty)) for (let k = 0; k < T8; k++) hpx(X + T8 - q*1.5 - (Math.sin(t*1.2 + k*0.9)*0.12 + 0.12), Y + k, q*1.5, 1, `rgba(255,255,255,${k % 2 ? 0.55 : 0.3})`);
+  }
+}
+function drawFishHi(t) { if (season() === 3) return; const q = 1/R;
+  for (const f of FA.fish) { const x = f.x, y = f.y, d = f.vx >= 0 ? 1 : -1, sw = Math.sin(t*6 + x)*0.25;
+    hEll(x, y + 1.6, 2.4, 0.5, 'rgba(0,20,60,.22)');   // 水下的影子
+    hEll(x, y + 0.5, 2.3, 1.1, '#ff9f43'); hEll(x, y + 0.95, 2.0, 0.55, '#ffd9a8'); hEll(x - d*0.2, y + 0.1, 1.8, 0.45, '#ffb463');
+    for (let i = 0; i < 5; i++) { const tx = x - d*(2.2 + i*0.36), hf = 0.3 + i*0.22; hpx(tx, y + 0.5 - hf + sw*i*0.3, 0.36, hf*2, i % 2 ? '#e07a1f' : '#f08a2a'); }   // 尾鰭
+    hpx(x - d*0.4 - 0.7, y - 0.5, 1.5, 0.5, '#e07a1f'); hpx(x + d*0.2, y + 1.3, 0.9, 0.4, '#e07a1f');   // 背鰭、腹鰭
+    for (let k = 0; k < 4; k++) hpx(x - d*(0.8 - k*0.55), y + 0.3 + (k % 2)*0.4, 0.35, 0.35, 'rgba(255,255,255,.4)');   // 鱗片
+    hEll(x + d*1.4, y + 0.3, 0.38, 0.38, '#ffffff'); hEll(x + d*1.5, y + 0.3, 0.2, 0.2, '#111');
+    if (Math.floor(t*0.7 + x) % 11 === 0) for (let k = 0; k < 6; k++) hpx(x - 2 + k*0.8, y - 1.6 + Math.abs(k - 2.5)*0.15, 0.5, q, 'rgba(230,246,255,.8)'); }
+}
+function drawBirdsHi(t) { if (darkness() > 0.55) return;
+  for (const b of FA.birds) { const x = b.x, y = b.y + Math.sin(b.p*2)*3, d = b.vx >= 0 ? 1 : -1, fl = Math.sin(t*11 + b.p*3), K = '#2b2b3a';
+    hEll(x, y, 1.4, 0.7, K); hEll(x + d*1.5, y - 0.2, 0.6, 0.55, K); hpx(x + d*2.0, y - 0.15, 0.7*d, 0.3, '#e0a030'); hpx(x - d*2.6, y - 0.1, 1.4*d, 0.5, K);   // 身體、頭、嘴、尾
+    hCurve(x - 0.4, y - 0.2, 2.6, fl*-1.6, 0.4, K); hCurve(x + 0.6, y - 0.1, 2.2, fl*-1.3, 0.35, '#3a3a4c'); }   // 拍動的雙翼
+}
+function drawRabbitHi(r, t) { if (darkness() > 0.7) return;
+  const f = r.face || 1, x = r.x, y = r.y, j = r.hop ? -Math.abs(Math.sin(r.hop))*3 : 0, w = season() === 3 ? '#f4f6fa' : '#d8c9b0', sh = season() === 3 ? '#d9dee8' : '#b8a68a', p = '#ffb0c0';
+  hEll(x, y - 0.1, 3.8, 0.9, 'rgba(0,0,0,.25)'); hEll(x - f*3.3, y - 2.9 + j, 1.0, 1.0, '#ffffff');   // 影子、棉球尾巴
+  hEll(x - f*1.4, y - 0.6 + j*0.4, 1.1, 0.7, sh); hEll(x + f*1.6, y - 0.6 + j*0.4, 0.9, 0.6, sh);   // 後腿、前腳
+  hEll(x, y - 2.6 + j, 3.3, 2.3, w); hEll(x + f*0.3, y - 1.7 + j, 2.5, 1.2, '#f2ead9'); hEll(x - f*0.8, y - 3.3 + j, 2.2, 1.0, sh);
+  hEll(x + f*2.7, y - 4.3 + j, 1.8, 1.6, w);   // 頭
+  hEll(x + f*1.9, y - 7.4 + j, 0.7, 1.9, sh); hEll(x + f*1.9, y - 7.4 + j, 0.32, 1.4, p); hEll(x + f*2.6, y - 7.6 + j, 0.7, 1.9, w); hEll(x + f*2.6, y - 7.5 + j, 0.32, 1.4, p);   // 耳朵與耳內粉紅
+  hEll(x + f*3.4, y - 4.6 + j, 0.36, 0.36, '#231400'); hpx(x + f*3.3 - 0.1, y - 4.8 + j, 0.2, 0.2, '#fff'); hpx(x + f*4.35 - (f < 0 ? 0.4 : 0), y - 4.0 + j, 0.4, 0.35, p);   // 眼睛與高光、鼻子
+}
 function drawSkyAndWater(t) {   // 飄動的雲、水面的波光
   if (evNow() === 'aurora') for (let x = 0; x < W; x += 3) for (let k = 0; k < 3; k++) { const y = 6 + k*8 + Math.sin(x*0.03 + t*0.6 + k*2)*6; ctx.globalAlpha = 0.55 + 0.3*Math.sin(t*1.3 + x*0.05 + k); px(x, y, 3, 9, ['#57ffb0', '#4dd2ff', '#b48aff'][k]); } ctx.globalAlpha = 1;   // 極光
   for (let i = 0; i < 6; i++) { const x = ((t*3 + i*97) % (W + 60)) - 30, y = 6 + (i*7) % 18; px(x, y, 16, 3, '#fff'); px(x + 3, y - 2, 9, 3, '#fff'); px(x + 2, y + 3, 12, 1, '#dfe9f5'); }
-  drawFish(t); if (season() !== 3) for (const r of WORLD.ripples) px(r.x + (Math.floor(t*1.5 + r.p) % 3), r.y, 5, 1, '#7fb8ff');
+  if (R > 1) drawFishHi(t); else drawFish(t); if (season() !== 3 && R === 1) for (const r of WORLD.ripples) px(r.x + (Math.floor(t*1.5 + r.p) % 3), r.y, 5, 1, '#7fb8ff');
 }
 function drawRain() {
   if (!(S.rain > 0)) return;
@@ -1650,6 +1738,7 @@ function render(t) {
   camT();
   if (R > 1) { hiLayers(); ctx.drawImage(hiG, 0, 0, W, H); if (fade > 0 && hiGold) { ctx.globalAlpha = fade; ctx.drawImage(hiGold, 0, 0, W, H); ctx.globalAlpha = 1; } ctx.drawImage(hiP, 0, 0, W, H); }
   else { ctx.drawImage(ground, 0, 0); if (fade > 0) { ctx.globalAlpha = fade; ctx.drawImage(ground2, 0, 0); ctx.globalAlpha = 1; } ctx.drawImage(pathC, 0, 0); }
+  if (R > 1) drawWaterHi(t);
   drawSkyAndWater(t);
   if (S.ritual) {   // 儀式：在小生物腳下浮現一隻發光的眼睛（眼白、杏仁眼框、虹膜、會看向滑鼠的瞳孔）
     const a = Math.min(1, S.ritual.t/3), { cx, cy, A, B, ir, pr } = EYE, eyeY = t => Math.sin(t)*B*(1 - 0.55*Math.cos(t)**2);
@@ -1666,7 +1755,7 @@ function render(t) {
   for (const n of S.nodes) if (vis(n)) items.push({ y: n.y, f: () => {
     const x = Math.round(n.x), y = Math.round(n.y);
     if (n.type === 'tree') { if (lod === 0) drawTreeLo(n); else if (R > 1) hiDraw(x - 12, y - 26, 24, 30, `t|${seN}|${x},${y}|${n.g < 1 ? Math.round(n.g*4) : 5}|${Math.min(n.apple, 4)}`, () => drawTree(n), (n.g === undefined || n.g >= 1) ? () => drawTreeHi(n) : null); else drawTree(n); }
-    else if (R > 1) hiDraw(x - 14, y - 17, 28, 21, `r|${seN}|${x},${y}|${Math.min(n.stone, 3)}`, () => drawRock(n)); else drawRock(n); } });
+    else if (R > 1) drawRockHi(n); else drawRock(n); } });
   for (const b of S.builds) if (vis(b)) items.push({ y: b.y, f: () => {
     if (lod === 0) return drawBuildLo(b, t); if (R === 1) return drawBuild(b, t);
     const bx = BOX[b.type] || [-20, -30, 40, 40], lit = darkness() > 0.5 && b.occ && b.occ.length ? 1 : 0, tb = ['fire', 'mill', 'hut', 'house'].includes(b.type) ? Math.floor(t*4) % 16 : 0;
@@ -1677,7 +1766,7 @@ function render(t) {
   if (S.ball) items.push({ y: S.ball.y, f: () => drawBall(S.ball) });
   for (const g of S.graves) items.push({ y: g.y, f: () => { px(g.x - 3, g.y - 1, 7, 2, '#6b7a45'); px(g.x - 2, g.y - 7, 5, 6, '#b9c1ce'); px(g.x - 1, g.y - 8, 3, 1, '#b9c1ce'); px(g.x - 2, g.y - 7, 1, 6, '#d5dbe6'); px(g.x + 2, g.y - 7, 1, 6, '#8b93a1'); px(g.x, g.y - 5, 1, 3, '#666e7d'); px(g.x - 1, g.y - 4, 3, 1, '#666e7d'); } });
   const nvis = R > 1 ? S.creatures.filter(vis).length : 0, fewC = nvis <= 40;   // 畫面上小生物不多才用細緻的臉
-  for (const r of FA.rabbits) if (vis(r)) items.push({ y: r.y, f: () => drawRabbit(r) });
+  for (const r of FA.rabbits) if (vis(r)) items.push({ y: r.y, f: () => R > 1 ? drawRabbitHi(r, t) : drawRabbit(r) });
   for (const c of S.creatures) if (vis(c)) items.push({ y: c.y, f: () => {
     if (lod === 0) return drawCreatureLo(c); if (R === 1) return drawCreature(c, t);
     if (c.bounce > 0) c.bounce -= 0.016;
@@ -1688,7 +1777,7 @@ function render(t) {
     if (fewC) drawFaceHi(c, t);
   } });
   items.sort((a, b) => a.y - b.y); for (const i of items) i.f();
-  drawBirds(t); drawEventFx(t);
+  if (R > 1) drawBirdsHi(t); else drawBirds(t); drawEventFx(t);
   baseT();
   // 夜晚與營火光
   const d = darkness();
