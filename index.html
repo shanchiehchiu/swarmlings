@@ -778,13 +778,18 @@ function refine(id, k, kind) {   // kind：'spr' 精靈（受光邊＋漸層＋�
   for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) {
     const i = y*cw + x, v = cur[i], a = v >>> 24; if (!a) continue;
     let r = v & 255, g = (v >> 8) & 255, b = (v >> 16) & 255;
-    const n = (((x*73856093) ^ (y*19349663)) >>> 0) % 9 - 4;   // 顆粒
+    const hh = ((x*73856093) ^ (y*19349663)) >>> 0, n = hh % 9 - 4;   // 顆粒
     if (kind !== 'ground' && a >= 128) {
       const up = y - rw < 0 || al(i - rw*cw) < 128, lf = x - rw < 0 || al(i - rw) < 128, dn = y + rw >= ch || al(i + rw*cw) < 128, rt = x + rw >= cw || al(i + rw) < 128;
       if (kind === 'spr') { const f = 1 - 0.13*(y/ch); r *= f; g *= f; b *= f; }
       if (up || lf) { r += (255 - r)*0.26; g += (255 - g)*0.26; b += (255 - b)*0.26; } else if (dn || rt) { r *= 0.78; g *= 0.78; b *= 0.78; }
     }
-    const gr = kind === 'ground' ? n*1.1 : n*0.6; r = clamp(r + gr, 0, 255) | 0; g = clamp(g + gr, 0, 255) | 0; b = clamp(b + gr, 0, 255) | 0;
+    let gr = kind === 'ground' ? n*1.5 + ((((x >> 1)*83492791) ^ ((y >> 1)*2654435761)) >>> 0) % 9*1.1 - 4.4 : n*0.6;   // 地面：細顆粒 + 粗一階的斑駁
+    if (kind === 'ground') {   // 草葉：高解析度才畫得出來——每根葉尖亮、葉根暗；泥土上有小石子
+      const grass = g > r + 8 && g > b + 8, isB = (xx, yy) => ((xx*7349 + yy*1913) >>> 0) % 41 === 0;
+      if (grass) { if (isB(x, y)) gr -= 26; else if (isB(x, y + 1)) gr += 30; else if (k >= 4 && isB(x, y + 2)) gr += 16; }
+      else if (r > g + 10 && r > b + 25 && hh % 47 === 0) gr += 34;
+    } r = clamp(r + gr, 0, 255) | 0; g = clamp(g + gr, 0, 255) | 0; b = clamp(b + gr, 0, 255) | 0;
     out[i] = (a << 24 | b << 16 | g << 8 | r) >>> 0;
   }
   const c = document.createElement('canvas'); c.width = cw; c.height = ch; c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(out.buffer), cw, ch), 0, 0); return c;
@@ -798,6 +803,8 @@ function hiDraw(x0, y0, w, h, key, fn) {   // 用原本的畫法畫進暫存畫�
   }
   ctx.drawImage(hit, x0, y0, w, h);
 }
+let hiGold = null;
+function snapGround() { ground2.getContext('2d').drawImage(ground, 0, 0); fade = 1; hiGold = (R > 1 && hiGv === gVer) ? hiG : null; }   // 換季／地形改變前先留下舊地面（低解析與高解析各一份），之後淡出
 let hiG = null, hiP = null, gVer = 0, pVer = 0, hiGv = -1, hiPv = -1, hiR = 1;
 function hiLayers() {   // 地面與道路的高解析版本：地面或道路一改變才重算
   if (hiR !== R) { hiR = R; hiGv = hiPv = -1; }
@@ -856,7 +863,7 @@ const evNow = () => S && S.ev ? S.ev.type : null;
 const evMul = () => evNow() === 'drought' ? 0.4 : evNow() === 'harvest' ? 2.5 : 1;   // 果子生長速度
 const evTide = () => evNow() === 'drought' ? -0.03 : 0;
 const METEORS = [];
-function refreshTerrain() { ground2.getContext('2d').drawImage(ground, 0, 0); fade = 1; applyWater(TIDE[season()] + evTide()); buildGround(); }
+function refreshTerrain() { snapGround(); applyWater(TIDE[season()] + evTide()); buildGround(); }
 function startEvent(type) {
   const E = EVENTS[type]; S.ev = { type, t: 0, dur: rnd(...E.dur) }; S.evCd = rnd(320, 620);
   showBanner(E.msg[0], E.msg[1], 4200, E.ic); logMsg(E.msg[0], E.msg[1]); addHist(E.msg[0], E.msg[1], E.ic); S.evSeen = S.evSeen || {}; S.evSeen[type] = (S.evSeen[type] || 0) + 1; sfx.event(type);
@@ -1397,6 +1404,35 @@ const BODY = ['..oooooooo..', '.oyyyyyyyyo.', 'oyyllyyyyyyo', 'oyllyyyyyyyo', 'o
 const BABY = ['.oooooo.', 'oyyyyyyo', 'oylyyyyo', 'oyyyyyyo', 'oyyyyyyo', 'oydyydyo', '.oooooo.'];
 const PAL = { o: '#6b4308', y: '#f6c945', l: '#ffe98a', d: '#dba01f', k: '#231400', w: '#ffffff', p: '#ff9db0' };
 const ACC = { farmer: c => { px(c.x - 5, c.y - 10, 10, 1, '#e8c34a'); px(c.x - 3, c.y - 12, 6, 2, '#f0d060'); }, fisher: c => { px(c.x - 4, c.y - 11, 8, 2, '#3a78c9'); px(c.x + 3, c.y - 10, 3, 1, '#1f4a8a'); }, forager: c => { px(c.x - 2 + 3, c.y - 12, 4, 2, '#4ec96a'); px(c.x + 1 + 3, c.y - 13, 2, 2, '#3aa055'); }, lumber: c => px(c.x - 4, c.y - 11, 8, 2, '#8b5a2b'), miner: c => { px(c.x - 4, c.y - 11, 8, 2, '#9aa4b2'); px(c.x - 1, c.y - 12, 2, 1, '#ffe14d'); }, builder: c => px(c.x - 4, c.y - 11, 8, 2, '#ff8f1f'), thinker: c => { px(c.x - 4, c.y - 5, 4, 1, '#231400'); px(c.x, c.y - 5, 4, 1, '#231400'); } };
+let FACE_HI = false;
+const hpx = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); };   // 可用小數座標：畫在 2×／4× 畫布上，最小單位是 1/R 個像素
+function hEll(cx, cy, rx, ry, col) {   // 以 1/R 為單位逐行畫橢圓，邊緣保持像素階梯
+  const q = 1/R; for (let yy = -ry; yy < ry - 1e-6; yy += q) { const hw = rx*Math.sqrt(Math.max(0, 1 - ((yy + q/2)/ry)**2)), x0 = Math.round((cx - hw)/q)*q, w = Math.max(q, Math.round(2*hw/q)*q); hpx(x0, Math.round((cy + yy)/q)*q, w, q, col); }
+}
+function hCurve(cx, cy, half, amp, th, col) {   // 一條彎線（微笑、閉眼、眉毛）：y = amp·(1 − (x/half)²)
+  const q = 1/R; for (let x = -half; x <= half + 1e-6; x += q) hpx(Math.round((cx + x)/q)*q, Math.round((cy + amp*(1 - (x/half)**2))/q)*q, q, th, col);
+}
+function drawFaceHi(c, t) {   // 細緻的臉：帶輪廓的眼白、虹膜與瞳孔、眼神高光、眉毛、腮紅、依心情彎曲的嘴
+  const adult = c.age >= 25, sleeping = c.st === 'sleep', bob = c.st === 'walk' ? (Math.floor(t*8) % 2) : 0, jump = c.bounce > 0 ? -2 : 0;
+  const ox = Math.round(c.x) - (adult ? 6 : 4), oy = Math.round(c.y) - (adult ? 11 : 7) - bob + jump - (sleeping ? -2 : 0), mn = Math.min(c.h, c.c, c.f), q = 1/R;
+  const watching = S.phase === 'awake' || S.phase === 'done' || dlgOpen || S.ritual, K = '#231400';
+  const lx = watching ? clamp((mouse.x - c.x)/40, -1, 1) : c.face*0.7, ly = watching ? clamp((mouse.y - c.y)/40, -1, 1) : 0, blink = Math.floor(t*2 + c.id*7) % 9 === 0;
+  const ex = adult ? [ox + 3.8, ox + 8.2] : [ox + 2.7, ox + 5.3], ey = adult ? oy + 4.9 : oy + 3.5, er = adult ? 1 : 0.75, mx = adult ? ox + 6 : ox + 4, my = adult ? oy + 8 : oy + 5.2;
+  if (adult && mn > 50) for (const cx of [ox + 2.1, ox + 9.9]) { ctx.globalAlpha = mn > 65 ? 0.6 : 0.3; hEll(cx, oy + 6.9, 1.1, 0.6, '#ff8fb0'); ctx.globalAlpha = 1; }   // 腮紅
+  for (const cx of ex) {
+    if (sleeping || blink) { hCurve(cx, ey + 0.1, 1.3*er, 0.35, 2*q, K); continue; }
+    hEll(cx, ey, 1.5*er + 0.3, 1.8*er + 0.3, '#3a2508'); hEll(cx, ey, 1.5*er, 1.8*er, '#ffffff');   // 眼白與輪廓
+    const px0 = cx + lx*0.55*er, py0 = ey + ly*0.5*er; hEll(px0, py0, 0.95*er, 1.15*er, '#6b4416'); hEll(px0, py0, 0.62*er, 0.8*er, '#120a06');   // 虹膜、瞳孔
+    hpx(Math.round((px0 - 0.5*er)/q)*q, Math.round((py0 - 0.6*er)/q)*q, Math.max(q, 0.4*er), Math.max(q, 0.4*er), '#ffffff');   // 眼神高光
+  }
+  if (adult && !sleeping) for (let k = 0; k < 2; k++) { const s0 = k ? -1 : 1, cx = ex[k];   // 眉毛：開心上揚、難過八字
+    if (mn < 30) { for (let x = -1.2; x <= 1.2; x += q) hpx(Math.round((cx + x)/q)*q, Math.round((ey - 2.5 + (x*s0*-0.35))/q)*q, q, q*1.5, '#5b3a12'); }
+    else if (mn > 65) hCurve(cx, ey - 2.7, 1.2, 0.3, q*1.5, '#5b3a12'); }
+  if (c.h < 25 && adult) { hEll(mx, my + 0.3, 0.9, 1.0, K); hEll(mx, my + 0.8, 0.55, 0.4, '#e8607a'); }   // 餓得張大嘴
+  else if (mn < 30) hCurve(mx, my + 0.6, 1.5, -0.6, q*1.5, K);
+  else if (mn > 65) { hCurve(mx, my - 0.1, 1.7, 0.8, q*1.5, K); }
+  else hpx(Math.round((mx - 0.9)/q)*q, Math.round(my/q)*q, 1.8, q*1.5, K);
+}
 function drawCreature(c, t) {
   const adult = c.age >= 25, bob = c.st === 'walk' ? (Math.floor(t*8) % 2) : 0, jump = c.bounce > 0 ? -2 : 0; if (c.bounce > 0) c.bounce -= 0.016;
   const sleeping = c.st === 'sleep';
@@ -1406,7 +1442,7 @@ function drawCreature(c, t) {
   if (adult && c.age > c.life*0.85) { px(ox + 2, oy - 1, 8, 1, '#f4f4f4'); px(ox + 1, oy, 2, 3, '#f4f4f4'); px(ox + 9, oy, 2, 3, '#f4f4f4'); }   // 長者：白髮
   if (adult) { px(ox + 3, oy - 1, 1, 1, PAL.y); px(ox + 8, oy - 1, 1, 1, PAL.y); px(ox + 3, oy + 10, 2, 1, PAL.o); px(ox + 7, oy + 10, 2, 1, PAL.o); }
   const mn = Math.min(c.h, c.c, c.f), watching = S.phase === 'awake' || S.phase === 'done' || dlgOpen || S.ritual;
-  // 眼睛
+  if (!FACE_HI) {   // 近景／特寫時，眼睛和嘴改由 drawFaceHi 用更細的解析度畫在上面
   if (sleeping) { if (adult) { px(ox + 3, oy + 5, 2, 1, PAL.k); px(ox + 7, oy + 5, 2, 1, PAL.k); } else { px(ox + 2, oy + 3, 1, 1, PAL.k); px(ox + 5, oy + 3, 1, 1, PAL.k); } }
   else if (adult) {
     const lx = watching ? clamp(Math.round((mouse.x - c.x)/40), -1, 1) : c.face, ly = watching ? clamp(Math.round((mouse.y - c.y)/40), -1, 1) : 0;
@@ -1418,8 +1454,9 @@ function drawCreature(c, t) {
     else if (mn < 30) { px(ox + 4, oy + 8, 1, 1, PAL.k); px(ox + 5, oy + 7, 2, 1, PAL.k); px(ox + 7, oy + 8, 1, 1, PAL.k); }
     else if (mn > 65) { px(ox + 4, oy + 7, 1, 1, PAL.k); px(ox + 5, oy + 8, 2, 1, PAL.k); px(ox + 7, oy + 7, 1, 1, PAL.k); px(ox + 2, oy + 6, 1, 1, PAL.p); px(ox + 9, oy + 6, 1, 1, PAL.p); }
     else px(ox + 5, oy + 7, 2, 1, PAL.k);
-    if (ACC[c.role]) ACC[c.role]({ x: ox + 6, y: oy + 10 });   // 配件貼在頭頂上（之前浮在頭上方好幾格）
   } else { px(ox + 2, oy + 3, 1, 1, PAL.k); px(ox + 5, oy + 3, 1, 1, PAL.k); if (mn > 60) px(ox + 3, oy + 4, 2, 1, PAL.k); }
+  }
+  if (adult && ACC[c.role]) ACC[c.role]({ x: ox + 6, y: oy + 10 });   // 配件貼在頭頂上
   // 髒污
   const dirt = Math.floor((100 - c.c)/22); for (let i = 0; i < dirt; i++) px(ox + [2, 8, 5, 3][i % 4] + (i > 3 ? 1 : 0), oy + [7, 2, 8, 6][i % 4], 1, 1, '#7a5330');
   if (c.carry) px(c.x - 3, c.y - (adult ? 16 : 12), 5, 4, c.carry === 'apple' ? '#e23b3b' : c.carry === 'wood' ? '#8b5a2b' : '#9aa4b2');
@@ -1543,7 +1580,7 @@ function render(t) {
   if (nr !== R) { R = nr; cv.width = W*R; cv.height = H*R; sprCache.clear(); }
   baseT(); ctx.imageSmoothingEnabled = false; ctx.fillStyle = '#0d0820'; ctx.fillRect(0, 0, W, H);
   camT();
-  if (R > 1) { hiLayers(); ctx.drawImage(hiG, 0, 0, W, H); ctx.drawImage(hiP, 0, 0, W, H); }
+  if (R > 1) { hiLayers(); ctx.drawImage(hiG, 0, 0, W, H); if (fade > 0 && hiGold) { ctx.globalAlpha = fade; ctx.drawImage(hiGold, 0, 0, W, H); ctx.globalAlpha = 1; } ctx.drawImage(hiP, 0, 0, W, H); }
   else { ctx.drawImage(ground, 0, 0); if (fade > 0) { ctx.globalAlpha = fade; ctx.drawImage(ground2, 0, 0); ctx.globalAlpha = 1; } ctx.drawImage(pathC, 0, 0); }
   drawSkyAndWater(t);
   if (S.ritual) {   // 儀式：在小生物腳下浮現一隻發光的眼睛（眼白、杏仁眼框、虹膜、會看向滑鼠的瞳孔）
@@ -1572,7 +1609,7 @@ function render(t) {
   if (S.ball) items.push({ y: S.ball.y, f: () => drawBall(S.ball) });
   for (const g of S.graves) items.push({ y: g.y, f: () => { px(g.x - 3, g.y - 1, 7, 2, '#6b7a45'); px(g.x - 2, g.y - 7, 5, 6, '#b9c1ce'); px(g.x - 1, g.y - 8, 3, 1, '#b9c1ce'); px(g.x - 2, g.y - 7, 1, 6, '#d5dbe6'); px(g.x + 2, g.y - 7, 1, 6, '#8b93a1'); px(g.x, g.y - 5, 1, 3, '#666e7d'); px(g.x - 1, g.y - 4, 3, 1, '#666e7d'); } });
   for (const r of FA.rabbits) if (vis(r)) items.push({ y: r.y, f: () => drawRabbit(r) });
-  for (const c of S.creatures) if (vis(c)) items.push({ y: c.y, f: () => lod === 0 ? drawCreatureLo(c) : R > 1 ? hiDraw(Math.round(c.x) - 10, Math.round(c.y) - 20, 20, 25, null, () => drawCreature(c, t)) : drawCreature(c, t) });
+  for (const c of S.creatures) if (vis(c)) items.push({ y: c.y, f: () => lod === 0 ? drawCreatureLo(c) : R > 1 ? (() => { FACE_HI = true; try { hiDraw(Math.round(c.x) - 10, Math.round(c.y) - 20, 20, 25, null, () => drawCreature(c, t)); } finally { FACE_HI = false; } drawFaceHi(c, t); })() : drawCreature(c, t) });
   items.sort((a, b) => a.y - b.y); for (const i of items) i.f();
   drawBirds(t); drawEventFx(t);
   baseT();
@@ -1833,7 +1870,7 @@ let last = performance.now(), acc = 0;
 const ground2 = document.createElement('canvas'); ground2.width = W; ground2.height = H; let fade = 0, curSea = -1;
 function checkSeason(announce) {   // 季節一換，就重畫地表並交叉淡入
   const se = season(); if (se === curSea) return;
-  if (announce && curSea >= 0) { ground2.getContext('2d').drawImage(ground, 0, 0); fade = 1; showBanner(SEA_NAME[se][0] + '天來了', SEA_NAME[se][1] + ' has come', 2600); logMsg(SEA_NAME[se][0] + '天來了', SEA_NAME[se][1] + ' has come'); }
+  if (announce && curSea >= 0) { snapGround(); showBanner(SEA_NAME[se][0] + '天來了', SEA_NAME[se][1] + ' has come', 2600); logMsg(SEA_NAME[se][0] + '天來了', SEA_NAME[se][1] + ' has come'); }
   if (announce && curSea >= 0 && S.hist) { const yr = Math.floor(S.t/(SEASON_LEN*4)); S.hs = S.hs || {};
     if (se === 3 && !S.hs['w' + yr]) { S.hs['w' + yr] = 1; addHist(`第 ${yr + 1} 個冬天來臨。`, `Winter ${yr + 1} arrived.`); }
     if (se === 0 && yr > 0 && !S.hs['s' + yr]) { S.hs['s' + yr] = 1; addHist(`度過了第 ${yr} 個冬天，春天回來了。`, `Survived winter ${yr}. Spring returned.`, 'sun'); } }
